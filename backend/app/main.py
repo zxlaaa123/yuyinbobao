@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.paths import DATA_DIR, AUDIO_DIR, UPLOAD_DIR, VECTOR_STORE_DIR
 from .core.database import engine, Base
 from . import models
+from .api import api_router
 
 app = FastAPI()
 
@@ -16,6 +17,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(api_router)
 
 
 @app.on_event("startup")

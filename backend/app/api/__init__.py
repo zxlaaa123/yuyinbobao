@@ -1,0 +1,5 @@
+from fastapi import APIRouter
+from .routes.knowledge_bases import router as knowledge_bases_router
+
+api_router = APIRouter()
+api_router.include_router(knowledge_bases_router)
