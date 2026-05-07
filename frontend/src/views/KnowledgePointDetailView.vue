@@ -5,7 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoint, updateKnowledgePoint, deleteKnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint'
 import { generateQuestions } from '../api/question'
-import { generateAudio } from '../api/audio'
+import { generateAudio, getAudioFiles } from '../api/audio'
 
 function getAudioUrl(fileUrl: string | null): string {
   if (!fileUrl) return ''
@@ -20,15 +20,28 @@ const loading = ref(false)
 const editing = ref(false)
 const editForm = reactive<KnowledgePointUpdate>({})
 
-// 生成音频
+// 音频
 const audioLoading = ref(false)
 const audioFileUrl = ref<string | null>(null)
 const audioError = ref<string | null>(null)
 
+async function loadExistingAudio() {
+  if (!kp.value) return
+  try {
+    const files = await getAudioFiles({ knowledge_point_id: kp.value.id })
+    // 找最近一个成功的音频
+    const successFile = files.find((f: any) => f.status === 'success')
+    if (successFile && successFile.file_url) {
+      audioFileUrl.value = successFile.file_url
+    }
+  } catch {
+    // 忽略加载错误
+  }
+}
+
 async function handleGenerateAudio() {
   if (!kp.value) return
   audioLoading.value = true
-  audioFileUrl.value = null
   audioError.value = null
   try {
     const result = await generateAudio(kp.value.id)
@@ -150,7 +163,10 @@ async function handleGenerateQuestions() {
   }
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await fetchData()
+  await loadExistingAudio()
+})
 </script>
 
 <template>
