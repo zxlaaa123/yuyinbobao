@@ -10,6 +10,8 @@ const form = reactive({
   AI_MODEL: '',
   AI_TEMPERATURE: 0.3,
   AI_TIMEOUT: 60,
+  AI_SEGMENT_SIZE: 3000,
+  AI_MAX_SEGMENTS: 5,
   TTS_PROVIDER: '',
   XIAOMI_TTS_API_KEY: '',
   XIAOMI_TTS_BASE_URL: '',
@@ -127,6 +129,14 @@ onMounted(fetchSettings)
           </el-form-item>
           <el-form-item label="Timeout (秒)">
             <el-input-number v-model="form.AI_TIMEOUT" :min="10" :max="300" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="分段大小（字符）">
+            <el-input-number v-model="form.AI_SEGMENT_SIZE" :min="1000" :max="20000" :step="500" style="width: 100%" />
+            <div class="field-tip">长文本分段提取时每段的字符数，根据模型上下文窗口调整</div>
+          </el-form-item>
+          <el-form-item label="最大分段数">
+            <el-input-number v-model="form.AI_MAX_SEGMENTS" :min="1" :max="20" style="width: 100%" />
+            <div class="field-tip">长文本最多分几段，超出部分合并到最后一段</div>
           </el-form-item>
         </el-form>
         <div class="card-actions">
@@ -251,6 +261,13 @@ onMounted(fetchSettings)
   display: flex;
   gap: 10px;
   margin-top: 8px;
+}
+
+.field-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #667085;
+  line-height: 1.4;
 }
 
 .test-result {
