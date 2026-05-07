@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.config import (
-    get_setting, TTS_PROVIDER,
+    TTS_PROVIDER,
     XIAOMI_TTS_API_KEY, XIAOMI_TTS_BASE_URL, XIAOMI_TTS_VOICE,
 )
+from ...services.setting_service import get_all_settings
 from ...models.knowledge_point import KnowledgePoint
 from ...models.audio_file import AudioFile
 from ...services.tts_service import build_text_from_knowledge_point, build_text_from_knowledge_points, synthesize_audio
@@ -50,11 +51,12 @@ async def generate_audio(body: dict, db: Session = Depends(get_db)):
     db.refresh(audio_record)
     print(f"audio_record 创建成功, id={audio_record.id}", flush=True)
 
-    # 获取 TTS 配置
-    provider = TTS_PROVIDER
-    xiaomi_key = XIAOMI_TTS_API_KEY
-    xiaomi_base = XIAOMI_TTS_BASE_URL
-    xiaomi_voice = XIAOMI_TTS_VOICE
+    # 获取 TTS 配置（优先数据库，回退 .env）
+    settings = get_all_settings(db)
+    provider = settings.get("TTS_PROVIDER", TTS_PROVIDER)
+    xiaomi_key = settings.get("XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
+    xiaomi_base = settings.get("XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
+    xiaomi_voice = settings.get("XIAOMI_TTS_VOICE", XIAOMI_TTS_VOICE)
     print(f"配置: provider={provider}, key={xiaomi_key[:10] if xiaomi_key else 'EMPTY'}..., base={xiaomi_base}", flush=True)
 
     try:
@@ -141,10 +143,12 @@ async def generate_batch(body: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(audio_record)
 
-    provider = TTS_PROVIDER
-    xiaomi_key = XIAOMI_TTS_API_KEY
-    xiaomi_base = XIAOMI_TTS_BASE_URL
-    xiaomi_voice = XIAOMI_TTS_VOICE
+    # 获取 TTS 配置（优先数据库，回退 .env）
+    settings = get_all_settings(db)
+    provider = settings.get("TTS_PROVIDER", TTS_PROVIDER)
+    xiaomi_key = settings.get("XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
+    xiaomi_base = settings.get("XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
+    xiaomi_voice = settings.get("XIAOMI_TTS_VOICE", XIAOMI_TTS_VOICE)
 
     try:
         audio_bytes = await synthesize_audio(
