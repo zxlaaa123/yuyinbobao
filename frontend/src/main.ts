@@ -9,6 +9,7 @@ import KnowledgeBaseView from './views/KnowledgeBaseView.vue'
 import MaterialImportView from './views/MaterialImportView.vue'
 import KnowledgePointListView from './views/KnowledgePointListView.vue'
 import KnowledgePointDetailView from './views/KnowledgePointDetailView.vue'
+import PracticeView from './views/PracticeView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -17,6 +18,7 @@ const routes = [
   { path: '/materials/import', component: MaterialImportView },
   { path: '/knowledge-points', component: KnowledgePointListView },
   { path: '/knowledge-points/:id', component: KnowledgePointDetailView },
+  { path: '/practice', component: PracticeView },
 ]
 
 const router = createRouter({

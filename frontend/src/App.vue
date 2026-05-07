@@ -6,6 +6,7 @@ import KnowledgeBaseView from './views/KnowledgeBaseView.vue'
 import MaterialImportView from './views/MaterialImportView.vue'
 import KnowledgePointListView from './views/KnowledgePointListView.vue'
 import KnowledgePointDetailView from './views/KnowledgePointDetailView.vue'
+import PracticeView from './views/PracticeView.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -29,6 +30,7 @@ const menuItems = [
   { key: '/knowledge-bases', label: '知识库', icon: '📚' },
   { key: '/materials/import', label: '资料导入', icon: '📝' },
   { key: '/knowledge-points', label: '知识点', icon: '🧠' },
+  { key: '/practice', label: '刷题练习', icon: '✅' },
 ]
 </script>
 
