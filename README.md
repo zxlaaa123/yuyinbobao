@@ -25,7 +25,8 @@ ai-study-cast/
 ├── frontend/          # Vue3 前端
 │   └── src/
 │       ├── api/       # Axios 封装 + 接口调用
-│       └── App.vue    # 首页
+│       ├── views/     # 页面组件
+│       └── App.vue    # 入口 + 路由 + 侧边栏
 ├── backend/           # FastAPI 后端
 │   └── app/
 │       ├── core/      # paths.py, database.py
@@ -47,6 +48,7 @@ ai-study-cast/
 - [x] 阶段 3：前后端联通（Axios + 健康检查状态条）
 - [x] 阶段 4：数据库初始化（SQLite + 8 张表）
 - [x] 阶段 5：知识库管理（CRUD + 前端页面）
+- [x] 阶段 6：资料保存（CRUD + 资料导入页面）
 
 ## 快速启动
 
