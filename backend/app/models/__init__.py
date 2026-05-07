@@ -6,6 +6,7 @@ from .answer_record import AnswerRecord
 from .wrong_question import WrongQuestion
 from .audio_file import AudioFile
 from .app_setting import AppSetting
+from .review_task import ReviewTask
 
 __all__ = [
     "KnowledgeBase",
@@ -16,4 +17,5 @@ __all__ = [
     "WrongQuestion",
     "AudioFile",
     "AppSetting",
+    "ReviewTask",
 ]

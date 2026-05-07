@@ -11,6 +11,7 @@ from .routes.audio_files import router as audio_files_router
 from .routes.settings import router as settings_router
 from .routes.dashboard import router as dashboard_router
 from .routes.stats import router as stats_router
+from .routes.review import router as review_router
 
 api_router = APIRouter()
 api_router.include_router(knowledge_bases_router)
@@ -25,3 +26,4 @@ api_router.include_router(audio_files_router)
 api_router.include_router(settings_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(stats_router)
+api_router.include_router(review_router)
