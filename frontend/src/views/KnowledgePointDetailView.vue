@@ -7,6 +7,12 @@ import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint
 import { generateQuestions } from '../api/question'
 import { generateAudio } from '../api/audio'
 
+function getAudioUrl(fileUrl: string | null): string {
+  if (!fileUrl) return ''
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+  return `${baseUrl}${fileUrl}`
+}
+
 const route = useRoute()
 const router = useRouter()
 const kp = ref<KnowledgePoint | null>(null)
@@ -292,7 +298,7 @@ onMounted(fetchData)
           <p>正在生成音频，请稍候...</p>
         </div>
         <div v-else-if="audioFileUrl" class="audio-player">
-          <audio controls :src="audioFileUrl" style="width: 100%"></audio>
+          <audio controls :src="getAudioUrl(audioFileUrl)" style="width: 100%"></audio>
         </div>
         <div v-else-if="audioError" class="audio-error">
           {{ audioError }}
