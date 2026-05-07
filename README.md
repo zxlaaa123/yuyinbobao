@@ -29,9 +29,12 @@ ai-study-cast/
 │       └── App.vue    # 入口 + 路由 + 侧边栏
 ├── backend/           # FastAPI 后端
 │   └── app/
-│       ├── core/      # paths.py, database.py
+│       ├── api/       # 路由（knowledge_bases, materials, ai）
+│       ├── core/      # config.py, paths.py, database.py
 │       ├── models/    # 8 个 SQLAlchemy 模型
-│       └── main.py    # 入口 + 路由
+│       ├── schemas/   # Pydantic 请求/响应模型
+│       ├── services/  # ai_service, json_parser, prompt_templates
+│       └── main.py    # 入口 + 路由注册
 ├── data/              # 本地数据
 │   ├── app.db         # SQLite 数据库
 │   ├── audio/         # TTS 音频文件
@@ -49,6 +52,7 @@ ai-study-cast/
 - [x] 阶段 4：数据库初始化（SQLite + 8 张表）
 - [x] 阶段 5：知识库管理（CRUD + 前端页面）
 - [x] 阶段 6：资料保存（CRUD + 资料导入页面）
+- [x] 阶段 7：AI 知识点提取（extract-points + import-and-extract）
 
 ## 快速启动
 
