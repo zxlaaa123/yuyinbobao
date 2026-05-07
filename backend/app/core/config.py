@@ -1,18 +1,33 @@
-from dotenv import load_dotenv
 from pathlib import Path
 import os
 
-env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
+
+def _load_env():
+    env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+    if not env_path.exists():
+        return
+    with open(env_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+_load_env()
 
 
 def get_setting(db, key: str, default: str = "") -> str:
     from ..models.app_setting import AppSetting
     record = db.query(AppSetting).filter(AppSetting.key == key).first()
-    if record and record.value:
-        return record.value
-    return os.getenv(key, default)
+    if record and record.value and record.value.strip():
+        return record.value.strip()
+    val = os.getenv(key, "")
+    return val if val else default
 
 
 AI_PROVIDER = os.getenv("AI_PROVIDER", "deepseek")

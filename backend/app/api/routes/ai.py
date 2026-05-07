@@ -10,11 +10,11 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 
 
 def _get_ai_service(db: Session) -> AIService:
-    api_key = get_setting(db, "AI_API_KEY") or AI_API_KEY
-    base_url = get_setting(db, "AI_BASE_URL") or AI_BASE_URL
-    model = get_setting(db, "AI_MODEL") or AI_MODEL
-    temperature = float(get_setting(db, "AI_TEMPERATURE") or AI_TEMPERATURE)
-    timeout = int(get_setting(db, "AI_TIMEOUT") or AI_TIMEOUT)
+    api_key = get_setting(db, "AI_API_KEY", AI_API_KEY)
+    base_url = get_setting(db, "AI_BASE_URL", AI_BASE_URL)
+    model = get_setting(db, "AI_MODEL", AI_MODEL)
+    temperature = float(get_setting(db, "AI_TEMPERATURE", str(AI_TEMPERATURE)))
+    timeout = int(get_setting(db, "AI_TIMEOUT", str(AI_TIMEOUT)))
     if not api_key:
         raise HTTPException(status_code=400, detail="AI API Key 未配置，请先到设置页配置")
     if not base_url:
