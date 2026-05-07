@@ -260,7 +260,6 @@ onMounted(fetchData)
         </el-form>
       </div>
     </template>
-  </div>
     <!-- 生成题目弹窗 -->
     <el-dialog v-model="genDialogVisible" title="生成题目" width="480px">
       <el-form label-position="top">
@@ -290,7 +289,6 @@ onMounted(fetchData)
         <el-button type="primary" :loading="genLoading" @click="handleGenerateQuestions">生成</el-button>
       </template>
     </el-dialog>
-  </div>
 </template>
 
 <style scoped>
