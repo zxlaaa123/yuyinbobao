@@ -259,14 +259,14 @@ onMounted(fetchData)
           </el-form-item>
         </el-form>
       </div>
-    </template>
+
     <!-- 生成题目弹窗 -->
     <el-dialog v-model="genDialogVisible" title="生成题目" width="480px">
       <el-form label-position="top">
         <el-form-item label="题型">
           <el-checkbox-group v-model="genTypes">
-            <el-checkbox label="single_choice">单选题</el-checkbox>
-            <el-checkbox label="true_false">判断题</el-checkbox>
+            <el-checkbox value="single_choice">单选题</el-checkbox>
+            <el-checkbox value="true_false">判断题</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
         <el-form-item label="题目数量">
@@ -289,6 +289,7 @@ onMounted(fetchData)
         <el-button type="primary" :loading="genLoading" @click="handleGenerateQuestions">生成</el-button>
       </template>
     </el-dialog>
+  </div>
 </template>
 
 <style scoped>
