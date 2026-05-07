@@ -31,6 +31,7 @@ const menuItems = [
   { key: '/materials/import', label: '资料导入', icon: '📝' },
   { key: '/knowledge-points', label: '知识点', icon: '🧠' },
   { key: '/practice', label: '刷题练习', icon: '✅' },
+  { key: '/wrong-questions', label: '错题本', icon: '📌' },
 ]
 </script>
 
