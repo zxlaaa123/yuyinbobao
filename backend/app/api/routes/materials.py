@@ -3,12 +3,14 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...models.material import Material
 from ...models.knowledge_base import KnowledgeBase
-from ...schemas.material import MaterialCreate, MaterialUpdate, MaterialResponse
+from ...models.knowledge_point import KnowledgePoint
+from ...schemas.material import MaterialCreate, MaterialUpdate
+from .ai import _get_ai_service
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
 
-@router.get("", response_model=list[MaterialResponse])
+@router.get("", response_model=list[dict])
 def list_materials(knowledge_base_id: int | None = None, db: Session = Depends(get_db)):
     query = db.query(Material)
     if knowledge_base_id:
@@ -21,7 +23,7 @@ def list_materials(knowledge_base_id: int | None = None, db: Session = Depends(g
     return result
 
 
-@router.post("", response_model=MaterialResponse)
+@router.post("", response_model=dict)
 def create_material(body: MaterialCreate, db: Session = Depends(get_db)):
     if not body.knowledge_base_id:
         raise HTTPException(status_code=400, detail="请选择知识库")
@@ -48,7 +50,85 @@ def create_material(body: MaterialCreate, db: Session = Depends(get_db)):
     return _to_response(material, kb.name)
 
 
-@router.get("/{material_id}", response_model=MaterialResponse)
+@router.post("/import-and-extract")
+async def import_and_extract(body: dict, db: Session = Depends(get_db)):
+    knowledge_base_id = body.get("knowledge_base_id")
+    title = (body.get("title") or "").strip()
+    content = (body.get("content") or "").strip()
+    source = body.get("source")
+    note = body.get("note")
+
+    if not knowledge_base_id:
+        raise HTTPException(status_code=400, detail="请选择知识库")
+    kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == knowledge_base_id).first()
+    if not kb:
+        raise HTTPException(status_code=400, detail="知识库不存在")
+    if not title:
+        raise HTTPException(status_code=400, detail="资料标题不能为空")
+    if not content:
+        raise HTTPException(status_code=400, detail="资料正文不能为空")
+
+    material = Material(
+        knowledge_base_id=knowledge_base_id,
+        title=title,
+        content=content,
+        source=source,
+        note=note,
+        material_type="text",
+        content_length=len(content),
+        extracted_count=0,
+    )
+    db.add(material)
+    db.commit()
+    db.refresh(material)
+
+    ai_service = _get_ai_service(db)
+    try:
+        result = await ai_service.extract_knowledge_points(
+            knowledge_base_name=kb.name,
+            material_title=material.title,
+            material_content=material.content,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI 调用失败：{str(e)}")
+
+    knowledge_points = result.get("knowledge_points", [])
+    created = []
+    for kp in knowledge_points:
+        if not kp.get("title"):
+            continue
+        point = KnowledgePoint(
+            knowledge_base_id=material.knowledge_base_id,
+            material_id=material.id,
+            title=kp["title"],
+            summary=kp.get("summary", ""),
+            detail=kp.get("detail", ""),
+            exam_points=_dump_json(kp.get("exam_points")),
+            confusing_points=_dump_json(kp.get("confusing_points")),
+            memory_tips=_dump_json(kp.get("memory_tips")),
+            examples=_dump_json(kp.get("examples")),
+            importance=kp.get("importance", "medium") if kp.get("importance") in ("low", "medium", "high") else "medium",
+            tags=_dump_json(kp.get("tags")),
+        )
+        db.add(point)
+        created.append(point)
+
+    material.extracted_count = len(created)
+    db.commit()
+
+    return {
+        "material": {"id": material.id, "title": material.title},
+        "created_count": len(created),
+        "knowledge_points": [
+            {"id": p.id, "title": p.title, "importance": p.importance, "tags": _load_json(p.tags)}
+            for p in created
+        ],
+    }
+
+
+@router.get("/{material_id}", response_model=dict)
 def get_material(material_id: int, db: Session = Depends(get_db)):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
@@ -57,7 +137,7 @@ def get_material(material_id: int, db: Session = Depends(get_db)):
     return _to_response(material, kb.name if kb else "")
 
 
-@router.put("/{material_id}", response_model=MaterialResponse)
+@router.put("/{material_id}", response_model=dict)
 def update_material(material_id: int, body: MaterialUpdate, db: Session = Depends(get_db)):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
@@ -111,3 +191,22 @@ def _to_response(m: Material, kb_name: str) -> dict:
         "created_at": m.created_at,
         "updated_at": m.updated_at,
     }
+
+
+def _dump_json(value) -> str | None:
+    import json
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _load_json(value: str | None) -> list:
+    import json
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except Exception:
+        return []

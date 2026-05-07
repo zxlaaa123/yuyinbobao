@@ -40,3 +40,13 @@ export function createMaterial(data: MaterialCreate) {
 export function getKnowledgeBasesForSelect() {
   return request.get('/api/knowledge-bases') as Promise<KnowledgeBase[]>
 }
+
+export interface ExtractResult {
+  material: { id: number; title: string }
+  created_count: number
+  knowledge_points: { id: number; title: string; importance: string; tags: string[] }[]
+}
+
+export function importAndExtract(data: MaterialCreate) {
+  return request.post('/api/materials/import-and-extract', data) as Promise<ExtractResult>
+}

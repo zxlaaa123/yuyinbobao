@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createMaterial, getKnowledgeBasesForSelect } from '../api/material'
-import type { KnowledgeBase } from '../api/material'
+import { createMaterial, getKnowledgeBasesForSelect, importAndExtract } from '../api/material'
+import type { KnowledgeBase, ExtractResult } from '../api/material'
 
 const form = reactive({
   knowledge_base_id: undefined as number | undefined,
@@ -14,6 +14,8 @@ const form = reactive({
 
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const saving = ref(false)
+const extracting = ref(false)
+const extractResult = ref<ExtractResult | null>(null)
 
 async function fetchKnowledgeBases() {
   try {
@@ -23,23 +25,28 @@ async function fetchKnowledgeBases() {
   }
 }
 
-async function handleSave() {
+function validate(): boolean {
   if (!form.knowledge_base_id) {
     ElMessage.warning('请选择知识库')
-    return
+    return false
   }
   if (!form.title.trim()) {
     ElMessage.warning('资料标题不能为空')
-    return
+    return false
   }
   if (!form.content.trim()) {
     ElMessage.warning('资料正文不能为空')
-    return
+    return false
   }
+  return true
+}
+
+async function handleSave() {
+  if (!validate()) return
   saving.value = true
   try {
     await createMaterial({
-      knowledge_base_id: form.knowledge_base_id,
+      knowledge_base_id: form.knowledge_base_id!,
       title: form.title.trim(),
       content: form.content,
       source: form.source.trim() || undefined,
@@ -54,12 +61,34 @@ async function handleSave() {
   }
 }
 
+async function handleSaveAndExtract() {
+  if (!validate()) return
+  extracting.value = true
+  extractResult.value = null
+  try {
+    const result = await importAndExtract({
+      knowledge_base_id: form.knowledge_base_id!,
+      title: form.title.trim(),
+      content: form.content,
+      source: form.source.trim() || undefined,
+      note: form.note.trim() || undefined,
+    })
+    extractResult.value = result
+    ElMessage.success(`成功提取 ${result.created_count} 个知识点`)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || 'AI 提取失败，请重试')
+  } finally {
+    extracting.value = false
+  }
+}
+
 function resetForm() {
   form.knowledge_base_id = undefined
   form.title = ''
   form.content = ''
   form.source = ''
   form.note = ''
+  extractResult.value = null
 }
 
 onMounted(fetchKnowledgeBases)
@@ -74,50 +103,80 @@ onMounted(fetchKnowledgeBases)
       </div>
     </div>
 
-    <div class="form-card">
-      <div class="form-row">
-        <div class="form-item">
-          <label>所属知识库 <span class="required">*</span></label>
-          <el-select v-model="form.knowledge_base_id" placeholder="请选择知识库" style="width: 100%">
-            <el-option
-              v-for="kb in knowledgeBases"
-              :key="kb.id"
-              :label="kb.name"
-              :value="kb.id"
-            />
-          </el-select>
+    <div class="two-col">
+      <!-- 左侧表单 -->
+      <div class="form-card">
+        <div class="form-row">
+          <div class="form-item">
+            <label>所属知识库 <span class="required">*</span></label>
+            <el-select v-model="form.knowledge_base_id" placeholder="请选择知识库" style="width: 100%">
+              <el-option v-for="kb in knowledgeBases" :key="kb.id" :label="kb.name" :value="kb.id" />
+            </el-select>
+          </div>
+          <div class="form-item">
+            <label>资料来源</label>
+            <el-input v-model="form.source" placeholder="例如：手动粘贴、教材名称" />
+          </div>
         </div>
+
         <div class="form-item">
-          <label>资料来源</label>
-          <el-input v-model="form.source" placeholder="例如：手动粘贴、教材名称" />
+          <label>资料标题 <span class="required">*</span></label>
+          <el-input v-model="form.title" placeholder="例如：政府社会职能" maxlength="200" show-word-limit />
+        </div>
+
+        <div class="form-item">
+          <label>资料正文 <span class="required">*</span></label>
+          <el-input
+            v-model="form.content"
+            type="textarea"
+            :rows="12"
+            placeholder="在此粘贴学习资料内容..."
+            resize="vertical"
+          />
+          <div class="tip">建议单次导入 5000～10000 字以内。内容太长可以分段导入。</div>
+        </div>
+
+        <div class="form-item">
+          <label>备注</label>
+          <el-input v-model="form.note" type="textarea" :rows="2" placeholder="选填，记录资料来源或其他说明" />
+        </div>
+
+        <div class="actions">
+          <el-button @click="resetForm">清空</el-button>
+          <el-button type="primary" :loading="saving || extracting" @click="handleSave">保存资料</el-button>
+          <el-button type="success" :loading="extracting" @click="handleSaveAndExtract">保存并提取知识点</el-button>
         </div>
       </div>
 
-      <div class="form-item">
-        <label>资料标题 <span class="required">*</span></label>
-        <el-input v-model="form.title" placeholder="例如：政府社会职能" maxlength="200" show-word-limit />
-      </div>
+      <!-- 右侧 AI 提取结果 -->
+      <div class="result-card">
+        <div class="result-title">
+          <h3>AI 提取结果</h3>
+          <p>点击左侧"保存并提取知识点"后，这里会显示结构化知识点。</p>
+        </div>
 
-      <div class="form-item">
-        <label>资料正文 <span class="required">*</span></label>
-        <el-input
-          v-model="form.content"
-          type="textarea"
-          :rows="12"
-          placeholder="在此粘贴学习资料内容..."
-          resize="vertical"
-        />
-        <div class="tip">建议单次导入 5000～10000 字以内。内容太长可以分段导入。</div>
-      </div>
+        <div v-if="extracting" class="loading-box">
+          <div class="spinner"></div>
+          <p>正在调用 AI 提取知识点，请稍候...</p>
+        </div>
 
-      <div class="form-item">
-        <label>备注</label>
-        <el-input v-model="form.note" type="textarea" :rows="2" placeholder="选填，记录资料来源或其他说明" />
-      </div>
+        <div v-else-if="extractResult" class="result-content">
+          <div class="result-summary">
+            本次提取 <strong>{{ extractResult.created_count }}</strong> 个知识点
+          </div>
+          <div class="kp-list">
+            <div v-for="kp in extractResult.knowledge_points" :key="kp.id" class="kp-item">
+              <div class="kp-name">{{ kp.title }}</div>
+              <div class="kp-tags">
+                <span v-for="tag in (kp.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <div class="actions">
-        <el-button @click="resetForm">清空</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存资料</el-button>
+        <div v-else class="empty-hint">
+          暂无提取结果。粘贴一段资料后点击"保存并提取知识点"试试。
+        </div>
       </div>
     </div>
   </div>
@@ -126,7 +185,6 @@ onMounted(fetchKnowledgeBases)
 <style scoped>
 .page {
   padding: 24px 30px 42px;
-  max-width: 900px;
 }
 
 .header {
@@ -144,7 +202,14 @@ onMounted(fetchKnowledgeBases)
   font-size: 14px;
 }
 
-.form-card {
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-card,
+.result-card {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(230, 234, 242, 0.95);
   border-radius: 20px;
@@ -182,12 +247,99 @@ onMounted(fetchKnowledgeBases)
 
 .actions {
   display: flex;
-  gap: 12px;
-  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 8px;
 }
 
-@media (max-width: 640px) {
+/* 右侧结果 */
+.result-title h3 {
+  font-size: 18px;
+  margin: 0 0 6px;
+}
+
+.result-title p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.loading-box {
+  text-align: center;
+  padding: 40px 0;
+  color: #667085;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e6eaf2;
+  border-top-color: #4f7cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.result-summary {
+  padding: 12px 16px;
+  background: #edf3ff;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #315de6;
+  margin-bottom: 16px;
+}
+
+.kp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kp-item {
+  border: 1px solid #e6eaf2;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #f8fbff;
+}
+
+.kp-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.kp-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font-size: 12px;
+  background: #edf3ff;
+  color: #315de6;
+}
+
+.empty-hint {
+  text-align: center;
+  padding: 40px 0;
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .two-col {
+    grid-template-columns: 1fr;
+  }
   .form-row {
     grid-template-columns: 1fr;
   }
