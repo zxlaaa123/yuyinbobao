@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from .core.paths import DATA_DIR, AUDIO_DIR, UPLOAD_DIR, VECTOR_STORE_DIR
 from .core.database import engine, Base
 from . import models
@@ -19,6 +20,9 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+# 挂载静态文件目录
+app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
 
 
 @app.on_event("startup")

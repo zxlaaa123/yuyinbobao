@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoint, updateKnowledgePoint, deleteKnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint'
 import { generateQuestions } from '../api/question'
+import { generateAudio } from '../api/audio'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +13,28 @@ const kp = ref<KnowledgePoint | null>(null)
 const loading = ref(false)
 const editing = ref(false)
 const editForm = reactive<KnowledgePointUpdate>({})
+
+// 生成音频
+const audioLoading = ref(false)
+const audioFileUrl = ref<string | null>(null)
+const audioError = ref<string | null>(null)
+
+async function handleGenerateAudio() {
+  if (!kp.value) return
+  audioLoading.value = true
+  audioFileUrl.value = null
+  audioError.value = null
+  try {
+    const result = await generateAudio(kp.value.id)
+    audioFileUrl.value = result.file_url
+    ElMessage.success('音频生成成功')
+  } catch (e: any) {
+    audioError.value = e.response?.data?.detail || '音频生成失败'
+    ElMessage.error(audioError.value)
+  } finally {
+    audioLoading.value = false
+  }
+}
 
 // 生成题目
 const genDialogVisible = ref(false)
@@ -133,6 +156,7 @@ onMounted(fetchData)
       <div class="top-bar">
         <el-button @click="router.push('/knowledge-points')">← 返回列表</el-button>
         <div class="actions">
+          <el-button @click="handleGenerateAudio" :loading="audioLoading">生成音频</el-button>
           <el-button @click="genDialogVisible = true">生成题目</el-button>
           <el-button v-if="!editing" @click="startEdit">编辑</el-button>
           <el-button v-if="editing" @click="cancelEdit">取消</el-button>
@@ -258,6 +282,21 @@ onMounted(fetchData)
             <el-button size="small" @click="addItem('tags')">+ 添加</el-button>
           </el-form-item>
         </el-form>
+      </div>
+
+      <!-- 音频区域 -->
+      <div v-if="audioFileUrl || audioError || audioLoading" class="audio-section">
+        <h3>🎧 知识点音频</h3>
+        <div v-if="audioLoading" class="audio-loading">
+          <div class="spinner"></div>
+          <p>正在生成音频，请稍候...</p>
+        </div>
+        <div v-else-if="audioFileUrl" class="audio-player">
+          <audio controls :src="audioFileUrl" style="width: 100%"></audio>
+        </div>
+        <div v-else-if="audioError" class="audio-error">
+          {{ audioError }}
+        </div>
       </div>
 
       <!-- 生成题目弹窗 -->
@@ -477,6 +516,50 @@ onMounted(fetchData)
   color: #667085;
   font-size: 13px;
   margin-top: 6px;
+}
+
+/* 音频区域 */
+.audio-section {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(230, 234, 242, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
+}
+
+.audio-section h3 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.audio-loading {
+  text-align: center;
+  padding: 20px;
+  color: #667085;
+}
+
+.audio-loading .spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e6eaf2;
+  border-top-color: #4f7cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 8px;
+}
+
+.audio-player audio {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.audio-error {
+  color: #a61b1b;
+  font-size: 14px;
+  padding: 10px;
+  background: #fff0f0;
+  border-radius: 8px;
 }
 
 .question-preview {

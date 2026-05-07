@@ -6,6 +6,8 @@ from .routes.knowledge_points import router as knowledge_points_router
 from .routes.questions import router as questions_router
 from .routes.practice import router as practice_router
 from .routes.wrong_questions import router as wrong_questions_router
+from .routes.tts import router as tts_router
+from .routes.audio_files import router as audio_files_router
 
 api_router = APIRouter()
 api_router.include_router(knowledge_bases_router)
@@ -15,3 +17,5 @@ api_router.include_router(knowledge_points_router)
 api_router.include_router(questions_router)
 api_router.include_router(practice_router)
 api_router.include_router(wrong_questions_router)
+api_router.include_router(tts_router)
+api_router.include_router(audio_files_router)

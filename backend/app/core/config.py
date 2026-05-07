@@ -36,3 +36,8 @@ AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.deepseek.com")
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-chat")
 AI_TEMPERATURE = float(os.getenv("AI_TEMPERATURE", "0.3"))
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "120"))
+
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "mock")
+XIAOMI_TTS_API_KEY = os.getenv("XIAOMI_TTS_API_KEY", "")
+XIAOMI_TTS_BASE_URL = os.getenv("XIAOMI_TTS_BASE_URL", "")
+XIAOMI_TTS_VOICE = os.getenv("XIAOMI_TTS_VOICE", "mimo_default")
