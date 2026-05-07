@@ -40,7 +40,15 @@ async function handleSave() {
   aiTestResult.value = null
   ttsTestResult.value = null
   try {
-    await saveSettings(form)
+    // 敏感字段如果包含脱敏标记（****），不传该字段，避免覆盖真实 key
+    const payload: Record<string, any> = { ...form }
+    for (const key of ['AI_API_KEY', 'XIAOMI_TTS_API_KEY']) {
+      const val = payload[key]
+      if (typeof val === 'string' && val.includes('****')) {
+        delete payload[key]
+      }
+    }
+    await saveSettings(payload)
     ElMessage.success('设置已保存')
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || '保存失败')
