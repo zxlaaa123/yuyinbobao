@@ -38,6 +38,28 @@ export function generateBatchAudio(knowledgePointIds: number[]) {
   }>
 }
 
+export function generateDailyReviewAudio() {
+  return request.post('/api/tts/generate-daily-review', {}) as Promise<{
+    audio_id: number
+    title: string
+    knowledge_point_count: number
+    status: string
+    file_url: string
+  }>
+}
+
+export function generateWrongQuestionAudio(wrongQuestionIds: number[]) {
+  return request.post('/api/tts/generate-wrong-questions', {
+    wrong_question_ids: wrongQuestionIds,
+  }) as Promise<{
+    audio_id: number
+    title: string
+    knowledge_point_count: number
+    status: string
+    file_url: string
+  }>
+}
+
 export function getAudioFiles(params?: {
   knowledge_base_id?: number
   knowledge_point_id?: number

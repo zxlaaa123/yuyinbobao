@@ -22,9 +22,13 @@ function getAudioUrl(fileUrl: string | null): string {
 const filteredAudio = computed(() => {
   let list = audioFiles.value
   if (filterType.value === 'single') {
-    list = list.filter((a) => !a.title.startsWith('合集'))
+    list = list.filter((a) => !a.title.startsWith('合集') && !a.title.startsWith('每日复习') && !a.title.startsWith('错题复习'))
   } else if (filterType.value === 'collection') {
     list = list.filter((a) => a.title.startsWith('合集'))
+  } else if (filterType.value === 'daily_review') {
+    list = list.filter((a) => a.title.startsWith('每日复习'))
+  } else if (filterType.value === 'wrong_question') {
+    list = list.filter((a) => a.title.startsWith('错题复习'))
   }
   return list
 })
@@ -96,6 +100,8 @@ onMounted(async () => {
       <el-select v-model="filterType" placeholder="全部类型" clearable style="width: 160px" @change="fetchData">
         <el-option label="单个知识点" value="single" />
         <el-option label="合集音频" value="collection" />
+        <el-option label="每日复习" value="daily_review" />
+        <el-option label="错题复习" value="wrong_question" />
       </el-select>
     </div>
 

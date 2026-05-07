@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getWrongQuestions, markMastered, unmarkMastered, deleteWrongQuestion } from '../api/wrongQuestion'
 import { getKnowledgeBasesForSelect } from '../api/material'
+import { generateWrongQuestionAudio } from '../api/audio'
 import type { WrongQuestion } from '../api/wrongQuestion'
 import type { KnowledgeBase } from '../api/material'
 
@@ -11,14 +12,13 @@ const knowledgeBases = ref<KnowledgeBase[]>([])
 const loading = ref(false)
 const filterMastered = ref<boolean | undefined>(undefined)
 const filterKB = ref<number | undefined>()
+const selectedIds = ref<number[]>([])
+const batchLoading = ref(false)
 
 const filteredList = computed(() => {
   let list = wrongQuestions.value
   if (filterMastered.value !== undefined) {
     list = list.filter((wq) => wq.is_mastered === filterMastered.value)
-  }
-  if (filterKB.value) {
-    list = list.filter((wq) => wq.question.knowledge_point_title)
   }
   return list
 })
@@ -32,6 +32,31 @@ async function fetchData() {
     ElMessage.error('加载错题列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+function handleSelectionChange(selection: WrongQuestion[]) {
+  selectedIds.value = selection.map((wq) => wq.id)
+}
+
+async function handleBatchAudio() {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择至少一道错题')
+    return
+  }
+  if (selectedIds.value.length > 20) {
+    ElMessage.warning('一次最多选择 20 道错题')
+    return
+  }
+  batchLoading.value = true
+  try {
+    const result = await generateWrongQuestionAudio(selectedIds.value)
+    ElMessage.success(`错题音频生成成功（${result.knowledge_point_count} 个知识点）`)
+    selectedIds.value = []
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '生成失败')
+  } finally {
+    batchLoading.value = false
   }
 }
 
@@ -64,6 +89,7 @@ async function handleDelete(wq: WrongQuestion) {
     )
     await deleteWrongQuestion(wq.id)
     wrongQuestions.value = wrongQuestions.value.filter((w) => w.id !== wq.id)
+    selectedIds.value = selectedIds.value.filter((id) => id !== wq.id)
     ElMessage.success('错题记录已删除')
   } catch (e: any) {
     if (e !== 'cancel') {
@@ -95,59 +121,76 @@ onMounted(fetchData)
       </el-select>
     </div>
 
+    <!-- 批量操作栏 -->
+    <div class="batch-bar" v-if="selectedIds.length > 0">
+      <span class="batch-info">已选择 {{ selectedIds.length }} 道错题</span>
+      <el-button
+        type="primary"
+        size="small"
+        :loading="batchLoading"
+        :disabled="batchLoading"
+        @click="handleBatchAudio"
+      >
+        生成错题音频
+      </el-button>
+      <el-button size="small" @click="selectedIds = []">取消选择</el-button>
+    </div>
+
     <!-- 空状态 -->
     <div v-if="!loading && filteredList.length === 0" class="empty">
       暂无错题，继续保持。
     </div>
 
-    <!-- 错题列表 -->
-    <div v-else class="wq-list">
-      <div v-for="wq in filteredList" :key="wq.id" class="wq-card">
-        <div class="wq-header">
-          <div class="wq-title">{{ wq.question.stem }}</div>
-          <div class="wq-badges">
-            <span class="badge mastered" :class="{ active: wq.is_mastered }">
-              {{ wq.is_mastered ? '已掌握' : '未掌握' }}
+    <!-- 错题表格 -->
+    <div v-else>
+      <el-table
+        :data="filteredList"
+        @selection-change="handleSelectionChange"
+        stripe
+        style="width: 100%"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="50" />
+        <el-table-column label="题干" min-width="250">
+          <template #default="{ row }">
+            <span>{{ row.question.stem }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <span class="badge mastered" :class="{ active: row.is_mastered }">
+              {{ row.is_mastered ? '已掌握' : '未掌握' }}
             </span>
-            <span class="badge count">错误 {{ wq.wrong_count }} 次</span>
-          </div>
-        </div>
-
-        <div class="wq-options">
-          <div
-            v-for="opt in wq.question.options"
-            :key="opt.key"
-            class="wq-opt"
-            :class="{
-              'user-wrong': opt.key === wq.last_wrong_answer,
-              'correct': opt.key === wq.question.answer,
-            }"
-          >
-            <span class="opt-key">{{ opt.key }}</span>
-            <span class="opt-text">{{ opt.text }}</span>
-            <span v-if="opt.key === wq.last_wrong_answer" class="opt-tag wrong">你的答案</span>
-            <span v-if="opt.key === wq.question.answer" class="opt-tag right">正确答案</span>
-          </div>
-        </div>
-
-        <div v-if="wq.question.analysis" class="wq-analysis">
-          <strong>解析：</strong>{{ wq.question.analysis }}
-        </div>
-
-        <div class="wq-meta" v-if="wq.question.knowledge_point_title">
-          关联知识点：{{ wq.question.knowledge_point_title }}
-        </div>
-
-        <div class="wq-actions">
-          <el-button v-if="!wq.is_mastered" size="small" type="success" @click="handleMarkMastered(wq)">
-            标记掌握
-          </el-button>
-          <el-button v-else size="small" @click="handleUnmarkMastered(wq)">
-            取消掌握
-          </el-button>
-          <el-button size="small" type="danger" @click="handleDelete(wq)">删除</el-button>
-        </div>
-      </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="错误次数" width="100">
+          <template #default="{ row }">
+            <span class="badge count">错误 {{ row.wrong_count }} 次</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上次错误答案" width="120">
+          <template #default="{ row }">
+            <span>{{ row.last_wrong_answer || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联知识点" min-width="150">
+          <template #default="{ row }">
+            <span v-if="row.question.knowledge_point_title">{{ row.question.knowledge_point_title }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="!row.is_mastered" size="small" type="success" @click="handleMarkMastered(row)">
+              标记掌握
+            </el-button>
+            <el-button v-else size="small" @click="handleUnmarkMastered(row)">
+              取消掌握
+            </el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
   </div>
 </template>
@@ -176,7 +219,24 @@ onMounted(fetchData)
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: #edf3ff;
+  border-radius: 12px;
+}
+
+.batch-info {
+  font-size: 14px;
+  color: #315de6;
+  font-weight: 600;
+  flex: 1;
 }
 
 .empty {
@@ -184,44 +244,6 @@ onMounted(fetchData)
   padding: 60px 0;
   color: #667085;
   font-size: 15px;
-}
-
-.wq-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.wq-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.wq-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.wq-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #182033;
-  line-height: 1.5;
-  flex: 1;
-}
-
-.wq-badges {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
 }
 
 .badge {
@@ -245,79 +267,5 @@ onMounted(fetchData)
 .badge.count {
   background: #fff8e7;
   color: #a06000;
-}
-
-.wq-options {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.wq-opt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  background: #f8fbff;
-  font-size: 14px;
-}
-
-.wq-opt.user-wrong {
-  background: #fff0f0;
-  border: 1px solid #ffd1d1;
-}
-
-.wq-opt.correct {
-  background: #e9fbf5;
-  border: 1px solid #bcefdc;
-}
-
-.opt-key {
-  font-weight: 700;
-  min-width: 20px;
-  color: #344054;
-}
-
-.opt-text {
-  flex: 1;
-  color: #344054;
-}
-
-.opt-tag {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 99px;
-  font-weight: 600;
-}
-
-.opt-tag.wrong {
-  background: #ffd1d1;
-  color: #a61b1b;
-}
-
-.opt-tag.right {
-  background: #bcefdc;
-  color: #087a59;
-}
-
-.wq-analysis {
-  font-size: 14px;
-  color: #667085;
-  line-height: 1.6;
-  padding: 10px 14px;
-  background: #f8fbff;
-  border-radius: 10px;
-}
-
-.wq-meta {
-  font-size: 13px;
-  color: #667085;
-}
-
-.wq-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
 }
 </style>

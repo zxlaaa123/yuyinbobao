@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
@@ -9,6 +10,9 @@ from ...core.config import (
 from ...services.setting_service import get_all_settings
 from ...models.knowledge_point import KnowledgePoint
 from ...models.audio_file import AudioFile
+from ...models.review_task import ReviewTask
+from ...models.wrong_question import WrongQuestion
+from ...models.question import Question
 from ...services.tts_service import build_text_from_knowledge_point, build_text_from_knowledge_points, synthesize_audio
 from ...services.audio_service import generate_audio_filename, generate_collection_filename, save_audio_file, build_file_url
 
@@ -179,3 +183,113 @@ async def generate_batch(body: dict, db: Session = Depends(get_db)):
         audio_record.error_message = error_detail
         db.commit()
         raise HTTPException(status_code=500, detail=f"合集音频生成失败：{error_detail}")
+
+
+async def _generate_collection_audio(db: Session, kps: list[KnowledgePoint], title_prefix: str) -> dict:
+    """通用合集音频生成逻辑"""
+    kp_ids = [kp.id for kp in kps]
+    text_content = build_text_from_knowledge_points(kps)
+
+    if len(text_content) > TTS_BATCH_MAX_CHARS:
+        raise HTTPException(status_code=400, detail=f"合集文本过长（{len(text_content)} 字符），超过上限 {TTS_BATCH_MAX_CHARS}")
+
+    audio_ext = "wav"
+    filename = generate_collection_filename(kp_ids, ext=audio_ext)
+
+    audio_record = AudioFile(
+        knowledge_point_id=kps[0].id,
+        title=f"{title_prefix}（{len(kps)} 个知识点）",
+        text_content=text_content,
+        file_path=str(filename),
+        file_url=build_file_url(filename),
+        status="pending",
+    )
+    db.add(audio_record)
+    db.commit()
+    db.refresh(audio_record)
+
+    settings = get_all_settings(db)
+    provider = settings.get("TTS_PROVIDER", TTS_PROVIDER)
+    xiaomi_key = settings.get("XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
+    xiaomi_base = settings.get("XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
+    xiaomi_voice = settings.get("XIAOMI_TTS_VOICE", XIAOMI_TTS_VOICE)
+
+    try:
+        audio_bytes = await synthesize_audio(
+            text_content,
+            provider=provider,
+            api_key=xiaomi_key,
+            base_url=xiaomi_base,
+            voice=xiaomi_voice,
+        )
+        file_path = save_audio_file(filename, audio_bytes)
+        audio_record.status = "success"
+        audio_record.file_path = file_path
+        db.commit()
+        db.refresh(audio_record)
+        return {
+            "audio_id": audio_record.id,
+            "title": audio_record.title,
+            "knowledge_point_count": len(kps),
+            "status": "success",
+            "file_url": audio_record.file_url,
+        }
+    except Exception as e:
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        audio_record.status = "failed"
+        audio_record.error_message = error_detail
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"音频生成失败：{error_detail}")
+
+
+@router.post("/generate-daily-review")
+async def generate_daily_review(body: dict, db: Session = Depends(get_db)):
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # 查找今日 pending 复习任务
+    pending_tasks = (
+        db.query(ReviewTask)
+        .filter(ReviewTask.status == "pending", ReviewTask.created_at >= today)
+        .all()
+    )
+
+    if not pending_tasks:
+        raise HTTPException(status_code=400, detail="今日暂无待复习任务，请先生成复习任务")
+
+    kp_ids = [t.knowledge_point_id for t in pending_tasks]
+    kps = db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(kp_ids)).all()
+
+    if not kps:
+        raise HTTPException(status_code=404, detail="复习任务关联的知识点不存在")
+
+    return await _generate_collection_audio(db, kps, "每日复习音频")
+
+
+@router.post("/generate-wrong-questions")
+async def generate_wrong_questions(body: dict, db: Session = Depends(get_db)):
+    wq_ids = body.get("wrong_question_ids", [])
+
+    if not wq_ids or not isinstance(wq_ids, list):
+        raise HTTPException(status_code=400, detail="缺少 wrong_question_ids（数组）")
+
+    if len(wq_ids) > TTS_BATCH_MAX_POINTS:
+        raise HTTPException(status_code=400, detail=f"一次最多生成 {TTS_BATCH_MAX_POINTS} 个错题的音频")
+
+    # 通过错题记录找到关联的知识点
+    wqs = db.query(WrongQuestion).filter(WrongQuestion.id.in_(wq_ids)).all()
+    if len(wqs) != len(wq_ids):
+        found_ids = {wq.id for wq in wqs}
+        missing = [i for i in wq_ids if i not in found_ids]
+        raise HTTPException(status_code=404, detail=f"错题记录不存在: {missing}")
+
+    # 通过题目找到知识点
+    question_ids = [wq.question_id for wq in wqs]
+    questions = db.query(Question).filter(Question.id.in_(question_ids)).all()
+    kp_ids = list({q.knowledge_point_id for q in questions})
+    kps = db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(kp_ids)).all()
+
+    if not kps:
+        raise HTTPException(status_code=404, detail="错题关联的知识点不存在")
+
+    return await _generate_collection_audio(db, kps, "错题复习音频")

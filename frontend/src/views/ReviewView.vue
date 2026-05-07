@@ -8,11 +8,13 @@ import {
   snoozeReviewTask,
   deleteReviewTask,
 } from '../api/review'
+import { generateDailyReviewAudio } from '../api/audio'
 import type { ReviewTask } from '../api/review'
 
 const tasks = ref<ReviewTask[]>([])
 const loading = ref(false)
 const generateLoading = ref(false)
+const audioLoading = ref(false)
 const filterStatus = ref<string>('pending')
 
 const filteredTasks = computed(() => {
@@ -49,6 +51,19 @@ async function handleGenerate() {
     ElMessage.error(e.response?.data?.detail || '生成失败')
   } finally {
     generateLoading.value = false
+  }
+}
+
+async function handleGenerateAudio() {
+  audioLoading.value = true
+  try {
+    const result = await generateDailyReviewAudio()
+    ElMessage.success(`每日复习音频生成成功（${result.knowledge_point_count} 个知识点）`)
+  } catch (e: any) {
+    const msg = e.response?.data?.detail || '生成失败'
+    ElMessage.error(msg)
+  } finally {
+    audioLoading.value = false
   }
 }
 
@@ -123,9 +138,14 @@ onMounted(fetchTasks)
         <h2>复习计划</h2>
         <p>基于错题和知识点重要性生成复习任务。</p>
       </div>
-      <el-button type="primary" :loading="generateLoading" @click="handleGenerate">
-        生成今日复习
-      </el-button>
+      <div class="header-actions">
+        <el-button type="primary" :loading="generateLoading" @click="handleGenerate">
+          生成今日复习
+        </el-button>
+        <el-button :loading="audioLoading" @click="handleGenerateAudio">
+          生成每日复习音频
+        </el-button>
+      </div>
     </div>
 
     <!-- 统计摘要 -->
@@ -221,6 +241,11 @@ onMounted(fetchTasks)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .title h2 {
