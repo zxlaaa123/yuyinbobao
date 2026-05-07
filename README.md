@@ -46,6 +46,7 @@ ai-study-cast/
 - [x] 阶段 2：前端最小页面（Vue3 + Element Plus）
 - [x] 阶段 3：前后端联通（Axios + 健康检查状态条）
 - [x] 阶段 4：数据库初始化（SQLite + 8 张表）
+- [x] 阶段 5：知识库管理（CRUD + 前端页面）
 
 ## 快速启动
 
