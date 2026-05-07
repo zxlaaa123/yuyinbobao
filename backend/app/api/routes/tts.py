@@ -1,7 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
-from ...core.config import get_setting, TTS_PROVIDER
+from ...core.config import (
+    get_setting, TTS_PROVIDER,
+    XIAOMI_TTS_API_KEY, XIAOMI_TTS_BASE_URL, XIAOMI_TTS_VOICE,
+)
 from ...models.knowledge_point import KnowledgePoint
 from ...models.audio_file import AudioFile
 from ...services.tts_service import build_text_from_knowledge_point, synthesize_audio
@@ -37,12 +40,21 @@ async def generate_audio(body: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(audio_record)
 
-    # 获取 TTS Provider
+    # 获取 TTS 配置
     provider = get_setting(db, "TTS_PROVIDER", TTS_PROVIDER)
+    xiaomi_key = get_setting(db, "XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
+    xiaomi_base = get_setting(db, "XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
+    xiaomi_voice = get_setting(db, "XIAOMI_TTS_VOICE", XIAOMI_TTS_VOICE)
 
     try:
         # 调用 TTS 生成音频
-        audio_bytes = await synthesize_audio(text_content, provider=provider)
+        audio_bytes = await synthesize_audio(
+            text_content,
+            provider=provider,
+            api_key=xiaomi_key,
+            base_url=xiaomi_base,
+            voice=xiaomi_voice,
+        )
 
         # 保存音频文件
         file_path = save_audio_file(filename, audio_bytes)

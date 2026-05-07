@@ -1,6 +1,7 @@
 import time
+import httpx
+import base64
 from .audio_service import generate_audio_filename, save_audio_file, build_file_url
-from .prompt_templates import build_extract_user_prompt
 
 
 def build_text_from_knowledge_point(kp) -> str:
@@ -54,27 +55,58 @@ def build_text_from_knowledge_point(kp) -> str:
     return "\n\n".join(parts)
 
 
-async def synthesize_audio(text: str, provider: str = "mock") -> bytes:
+async def synthesize_audio(text: str, provider: str = "mock", api_key: str = "", base_url: str = "", voice: str = "mimo_default") -> bytes:
     if provider == "mock":
         return _mock_synthesize(text)
     elif provider == "xiaomi":
-        return await _xiaomi_synthesize(text)
+        return await _xiaomi_synthesize(text, api_key, base_url, voice)
     else:
         raise ValueError(f"不支持的 TTS Provider: {provider}")
 
 
 def _mock_synthesize(text: str) -> bytes:
     """Mock TTS：生成一个简短的静音 MP3 占位文件"""
-    # 生成一个最小的有效 MP3 文件（静音）
-    import struct
-    # MP3 文件头 + 静音帧
     mp3_header = b'\xff\xfb\x90\x00'
-    # 生成约 1 秒的静音 MP3 数据
     silent_frame = mp3_header + b'\x00' * 417
-    num_frames = max(1, len(text) // 50)  # 根据文本长度决定"时长"
-    return silent_frame * min(num_frames, 30)  # 最多 30 帧
+    num_frames = max(1, len(text) // 50)
+    return silent_frame * min(num_frames, 30)
 
 
-async def _xiaomi_synthesize(text: str) -> bytes:
-    """小米 TTS Provider（预留）"""
-    raise NotImplementedError("小米 TTS Provider 尚未实现，请配置 XIAOMI_TTS_API_KEY 和 XIAOMI_TTS_BASE_URL")
+async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str) -> bytes:
+    """小米 TTS Provider"""
+    if not api_key:
+        raise ValueError("小米 TTS API Key 未配置")
+    if not base_url:
+        raise ValueError("小米 TTS Base URL 未配置")
+
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    headers = {
+        "api-key": api_key,
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "mimo-v2.5-tts",
+        "messages": [
+            {
+                "role": "user",
+                "content": "用清晰、自然的语调朗读以下知识点内容，语速适中，发音标准。"
+            },
+            {
+                "role": "assistant",
+                "content": text
+            }
+        ],
+        "audio": {
+            "format": "wav",
+            "voice": voice
+        }
+    }
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+
+    # 解析音频数据
+    audio_data = data["choices"][0]["message"]["audio"]["data"]
+    return base64.b64decode(audio_data)
