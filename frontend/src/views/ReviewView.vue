@@ -1,0 +1,422 @@
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  getReviewTasks,
+  generateReviewTasks,
+  completeReviewTask,
+  snoozeReviewTask,
+  deleteReviewTask,
+} from '../api/review'
+import type { ReviewTask } from '../api/review'
+
+const tasks = ref<ReviewTask[]>([])
+const loading = ref(false)
+const generateLoading = ref(false)
+const filterStatus = ref<string>('pending')
+
+const filteredTasks = computed(() => {
+  if (!filterStatus.value) return tasks.value
+  return tasks.value.filter((t) => t.status === filterStatus.value)
+})
+
+const pendingCount = computed(() => tasks.value.filter((t) => t.status === 'pending').length)
+const completedCount = computed(() => tasks.value.filter((t) => t.status === 'completed').length)
+const totalCount = computed(() => tasks.value.length)
+
+async function fetchTasks() {
+  loading.value = true
+  try {
+    tasks.value = await getReviewTasks()
+  } catch {
+    ElMessage.error('加载复习任务失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleGenerate() {
+  generateLoading.value = true
+  try {
+    const result = await generateReviewTasks(30)
+    if (result.created > 0) {
+      ElMessage.success(`已生成 ${result.created} 个复习任务`)
+    } else {
+      ElMessage.info(result.message || '没有新任务生成')
+    }
+    await fetchTasks()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '生成失败')
+  } finally {
+    generateLoading.value = false
+  }
+}
+
+async function handleComplete(task: ReviewTask, quality: string) {
+  try {
+    await completeReviewTask(task.id, quality)
+    ElMessage.success('已完成')
+    await fetchTasks()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '操作失败')
+  }
+}
+
+async function handleSnooze(task: ReviewTask) {
+  try {
+    await snoozeReviewTask(task.id, 24)
+    ElMessage.success('已推迟 24 小时')
+    await fetchTasks()
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '操作失败')
+  }
+}
+
+async function handleDelete(task: ReviewTask) {
+  try {
+    await ElMessageBox.confirm('确定要删除这个复习任务吗？', '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await deleteReviewTask(task.id)
+    ElMessage.success('任务已删除')
+    await fetchTasks()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e.response?.data?.detail || '删除失败')
+    }
+  }
+}
+
+function sourceLabel(source: string): string {
+  const map: Record<string, string> = {
+    wrong_question: '错题复习',
+    importance_high: '重点知识点',
+    new_knowledge: '新知识点',
+  }
+  return map[source] || source
+}
+
+function difficultyLabel(difficulty: string): string {
+  const map: Record<string, string> = {
+    easy: '简单',
+    medium: '中等',
+    hard: '困难',
+  }
+  return map[difficulty] || difficulty
+}
+
+function formatDate(d: string | null): string {
+  if (!d) return '-'
+  return new Date(d).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+onMounted(fetchTasks)
+</script>
+
+<template>
+  <div class="page">
+    <!-- 顶部 -->
+    <div class="header">
+      <div class="title">
+        <h2>复习计划</h2>
+        <p>基于错题和知识点重要性生成复习任务。</p>
+      </div>
+      <el-button type="primary" :loading="generateLoading" @click="handleGenerate">
+        生成今日复习
+      </el-button>
+    </div>
+
+    <!-- 统计摘要 -->
+    <div class="summary-row">
+      <div class="summary-card">
+        <span class="s-label">待复习</span>
+        <span class="s-value accent-red">{{ pendingCount }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="s-label">已完成</span>
+        <span class="s-value accent-green">{{ completedCount }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="s-label">全部任务</span>
+        <span class="s-value">{{ totalCount }}</span>
+      </div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="filters">
+      <el-radio-group v-model="filterStatus">
+        <el-radio-button label="">全部</el-radio-button>
+        <el-radio-button label="pending">待复习</el-radio-button>
+        <el-radio-button label="completed">已完成</el-radio-button>
+      </el-radio-group>
+    </div>
+
+    <!-- 空状态 -->
+    <div v-if="!loading && filteredTasks.length === 0" class="empty">
+      <div class="empty-icon">📋</div>
+      <p v-if="filterStatus === 'pending'">暂无待复习任务，点击"生成今日复习"开始</p>
+      <p v-else-if="filterStatus === 'completed'">暂无已完成任务</p>
+      <p v-else>暂无复习任务</p>
+    </div>
+
+    <!-- 任务列表 -->
+    <div v-else-if="!loading" class="task-list">
+      <div
+        v-for="task in filteredTasks"
+        :key="task.id"
+        class="task-card"
+        :class="{ completed: task.status === 'completed' }"
+      >
+        <div class="task-main">
+          <div class="task-info">
+            <div class="task-kp-id">知识点 #{{ task.knowledge_point_id }}</div>
+            <div class="task-badges">
+              <span class="badge source">{{ sourceLabel(task.source) }}</span>
+              <span class="badge difficulty" :class="task.difficulty">{{ difficultyLabel(task.difficulty) }}</span>
+              <span class="badge status" :class="task.status">{{ task.status === 'completed' ? '已完成' : '待复习' }}</span>
+            </div>
+          </div>
+          <div class="task-meta">
+            <span>创建于 {{ formatDate(task.created_at) }}</span>
+            <span v-if="task.scheduled_at"> · 计划 {{ formatDate(task.scheduled_at) }}</span>
+            <span v-if="task.snooze_count > 0"> · 推迟 {{ task.snooze_count }} 次</span>
+          </div>
+        </div>
+
+        <div class="task-actions" v-if="task.status === 'pending'">
+          <el-button-group class="quality-buttons">
+            <el-button size="small" :loading="false" @click="handleComplete(task, 'again')">Again</el-button>
+            <el-button size="small" @click="handleComplete(task, 'hard')">Hard</el-button>
+            <el-button size="small" type="success" @click="handleComplete(task, 'good')">Good</el-button>
+            <el-button size="small" type="primary" @click="handleComplete(task, 'easy')">Easy</el-button>
+          </el-button-group>
+          <el-button size="small" @click="handleSnooze(task)">稍后</el-button>
+          <el-button size="small" type="danger" @click="handleDelete(task)">删除</el-button>
+        </div>
+
+        <div class="task-actions" v-else>
+          <span class="completed-text">完成于 {{ formatDate(task.completed_at) }}</span>
+          <el-button size="small" type="danger" @click="handleDelete(task)">删除</el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- loading -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>加载中...</p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.page {
+  padding: 24px 30px 42px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.title h2 {
+  font-size: 24px;
+  margin: 0;
+}
+
+.title p {
+  margin: 6px 0 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+/* 统计摘要 */
+.summary-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(230, 234, 242, 0.95);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.s-label {
+  font-size: 13px;
+  color: #667085;
+}
+
+.s-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #182033;
+}
+
+.s-value.accent-red {
+  color: #dc2626;
+}
+
+.s-value.accent-green {
+  color: #087a59;
+}
+
+/* 筛选 */
+.filters {
+  margin-bottom: 20px;
+}
+
+/* 空状态 */
+.empty {
+  text-align: center;
+  padding: 60px 0;
+  color: #667085;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty p {
+  font-size: 15px;
+  margin: 0;
+}
+
+/* 任务列表 */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(230, 234, 242, 0.95);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-card.completed {
+  opacity: 0.7;
+}
+
+.task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.task-kp-id {
+  font-size: 15px;
+  font-weight: 600;
+  color: #182033;
+}
+
+.task-badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge.source {
+  background: #edf3ff;
+  color: #315de6;
+}
+
+.badge.difficulty.easy {
+  background: #e9fbf5;
+  color: #087a59;
+}
+
+.badge.difficulty.medium {
+  background: #fff8e7;
+  color: #a06000;
+}
+
+.badge.difficulty.hard {
+  background: #fff0f0;
+  color: #a61b1b;
+}
+
+.badge.status.pending {
+  background: #fff8e7;
+  color: #a06000;
+}
+
+.badge.status.completed {
+  background: #e9fbf5;
+  color: #087a59;
+}
+
+.task-meta {
+  font-size: 12px;
+  color: #667085;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quality-buttons {
+  display: flex;
+}
+
+.completed-text {
+  font-size: 12px;
+  color: #667085;
+  flex: 1;
+}
+
+/* loading */
+.loading-state {
+  text-align: center;
+  padding: 40px 0;
+  color: #667085;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e6eaf2;
+  border-top-color: #4f7cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>

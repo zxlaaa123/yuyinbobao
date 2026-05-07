@@ -13,6 +13,7 @@ import PracticeView from './views/PracticeView.vue'
 import WrongQuestionView from './views/WrongQuestionView.vue'
 import AudioView from './views/AudioView.vue'
 import SettingsView from './views/SettingsView.vue'
+import ReviewView from './views/ReviewView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -25,6 +26,7 @@ const routes = [
   { path: '/wrong-questions', component: WrongQuestionView },
   { path: '/audio', component: AudioView },
   { path: '/settings', component: SettingsView },
+  { path: '/review', component: ReviewView },
 ]
 
 const router = createRouter({
