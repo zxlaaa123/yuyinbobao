@@ -3,10 +3,14 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getDashboardSummary } from '../api/dashboard'
 import type { DashboardSummary } from '../api/dashboard'
+import { getStatsOverview } from '../api/stats'
+import type { StatsOverview } from '../api/stats'
 
 const router = useRouter()
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
+const v2Stats = ref<StatsOverview | null>(null)
+const v2Loading = ref(true)
 
 const stats = [
   { key: 'knowledge_base_count', label: '知识库', icon: '📚', color: 0 },
@@ -34,11 +38,24 @@ async function fetchSummary() {
   }
 }
 
+async function fetchV2Stats() {
+  try {
+    v2Stats.value = await getStatsOverview()
+  } catch {
+    v2Stats.value = null
+  } finally {
+    v2Loading.value = false
+  }
+}
+
 function goTo(path: string) {
   router.push(path)
 }
 
-onMounted(fetchSummary)
+onMounted(() => {
+  fetchSummary()
+  fetchV2Stats()
+})
 </script>
 
 <template>
@@ -53,7 +70,7 @@ onMounted(fetchSummary)
       </div>
     </div>
 
-    <!-- 统计卡片 -->
+    <!-- V1 统计卡片 -->
     <div class="stats-grid">
       <div
         v-for="stat in stats"
@@ -65,6 +82,41 @@ onMounted(fetchSummary)
         <div class="stat-icon">{{ stat.icon }}</div>
         <div class="stat-value">{{ loading ? '-' : summary ? summary[stat.key as keyof DashboardSummary] : 0 }}</div>
         <div class="stat-label">{{ stat.label }}</div>
+      </div>
+    </div>
+
+    <!-- V2 学习统计 -->
+    <div class="v2-stats">
+      <div class="section-header">
+        <h3>📊 学习统计</h3>
+        <span v-if="v2Loading" class="loading-text">加载中...</span>
+        <span v-else-if="!v2Stats" class="error-text" @click="fetchV2Stats">加载失败，点击重试</span>
+      </div>
+      <div v-if="v2Stats && !v2Loading" class="v2-grid">
+        <div class="v2-card">
+          <div class="v2-label">今日练题</div>
+          <div class="v2-value">{{ v2Stats.today_answers }}</div>
+          <div class="v2-sub">正确 {{ v2Stats.today_correct }}</div>
+        </div>
+        <div class="v2-card">
+          <div class="v2-label">总正确率</div>
+          <div class="v2-value">{{ v2Stats.accuracy }}%</div>
+          <div class="v2-sub">{{ v2Stats.total_correct }}/{{ v2Stats.total_answers }} 题</div>
+        </div>
+        <div class="v2-card" @click="goTo('/wrong-questions')" style="cursor: pointer">
+          <div class="v2-label">待复习错题</div>
+          <div class="v2-value accent-red">{{ v2Stats.pending_review }}</div>
+          <div class="v2-sub">共 {{ v2Stats.wrong_total }} 道错题</div>
+        </div>
+        <div class="v2-card" @click="goTo('/audio')" style="cursor: pointer">
+          <div class="v2-label">音频</div>
+          <div class="v2-value accent-green">{{ v2Stats.audio_success }}</div>
+          <div v-if="v2Stats.audio_failed > 0" class="v2-sub error">失败 {{ v2Stats.audio_failed }}</div>
+          <div v-else class="v2-sub">成功生成</div>
+        </div>
+      </div>
+      <div v-else-if="!v2Stats && !v2Loading" class="v2-empty">
+        暂无统计数据，开始刷题后这里会显示学习进度
       </div>
     </div>
   </div>
@@ -209,15 +261,110 @@ onMounted(fetchSummary)
   color: #667085;
 }
 
+/* V2 学习统计 */
+.v2-stats {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(230, 234, 242, 0.95);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(25, 36, 70, 0.06);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header h3 {
+  font-size: 18px;
+  margin: 0;
+  color: #182033;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: #667085;
+}
+
+.error-text {
+  font-size: 13px;
+  color: #a61b1b;
+  cursor: pointer;
+}
+
+.error-text:hover {
+  text-decoration: underline;
+}
+
+.v2-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.v2-card {
+  background: #f8fbff;
+  border: 1px solid #e6eaf2;
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.v2-label {
+  font-size: 13px;
+  color: #667085;
+  margin-bottom: 8px;
+}
+
+.v2-value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #182033;
+  margin-bottom: 4px;
+}
+
+.v2-value.accent-red {
+  color: #dc2626;
+}
+
+.v2-value.accent-green {
+  color: #087a59;
+}
+
+.v2-sub {
+  font-size: 12px;
+  color: #667085;
+}
+
+.v2-sub.error {
+  color: #dc2626;
+}
+
+.v2-empty {
+  text-align: center;
+  padding: 32px 0;
+  color: #667085;
+  font-size: 14px;
+}
+
 @media (max-width: 900px) {
   .stats-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .v2-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 600px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .v2-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
