@@ -53,6 +53,7 @@ ai-study-cast/
 - [x] 阶段 5：知识库管理（CRUD + 前端页面）
 - [x] 阶段 6：资料保存（CRUD + 资料导入页面）
 - [x] 阶段 7：AI 知识点提取（extract-points + import-and-extract）
+- [x] 阶段 8：知识点页面（列表 + 详情 + 编辑 + 删除）
 
 ## 快速启动
 
