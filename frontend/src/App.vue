@@ -33,6 +33,7 @@ const menuItems = [
   { key: '/practice', label: '刷题练习', icon: '✅' },
   { key: '/wrong-questions', label: '错题本', icon: '📌' },
   { key: '/audio', label: '音频播报', icon: '🎧' },
+  { key: '/settings', label: '设置', icon: '⚙️' },
 ]
 </script>
 
