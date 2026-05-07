@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoint, updateKnowledgePoint, deleteKnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint'
 import { generateQuestions } from '../api/question'
+import type { GeneratedQuestion } from '../api/question'
 import { generateAudio, getAudioFiles } from '../api/audio'
 
 function getAudioUrl(fileUrl: string | null): string {
@@ -49,7 +50,7 @@ async function handleGenerateAudio() {
     ElMessage.success('音频生成成功')
   } catch (e: any) {
     audioError.value = e.response?.data?.detail || '音频生成失败'
-    ElMessage.error(audioError.value)
+    ElMessage.error(audioError.value || '音频生成失败')
   } finally {
     audioLoading.value = false
   }
@@ -60,7 +61,7 @@ const genDialogVisible = ref(false)
 const genCount = ref(5)
 const genTypes = ref<string[]>(['single_choice'])
 const genLoading = ref(false)
-const genResult = ref<{ created_count: number; skipped_count: number } | null>(null)
+const genResult = ref<{ created_count: number; skipped_count: number; questions?: GeneratedQuestion[] } | null>(null)
 
 async function fetchData() {
   loading.value = true

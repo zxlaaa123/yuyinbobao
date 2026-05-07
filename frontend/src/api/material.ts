@@ -1,6 +1,8 @@
 import request from './request'
 import type { KnowledgeBase } from './knowledgeBase'
 
+export type { KnowledgeBase }
+
 export interface Material {
   id: number
   knowledge_base_id: number

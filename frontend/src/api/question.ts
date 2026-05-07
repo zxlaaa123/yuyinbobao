@@ -37,10 +37,20 @@ export function deleteQuestion(id: number) {
   return request.delete(`/api/questions/${id}`) as Promise<{ success: boolean; message: string }>
 }
 
+export interface GeneratedQuestion {
+  id: number
+  question_type: string
+  stem: string
+  options: { key: string; text: string }[]
+  answer: string
+  analysis: string | null
+  difficulty: string
+}
+
 export function generateQuestions(knowledgePointId: number, questionTypes: string[], count: number) {
   return request.post('/api/ai/generate-questions', {
     knowledge_point_id: knowledgePointId,
     question_types: questionTypes,
     count,
-  }) as Promise<{ created_count: number; skipped_count: number; questions: { id: number; question_type: string; stem: string; answer: string; difficulty: string }[] }>
+  }) as Promise<{ created_count: number; skipped_count: number; questions: GeneratedQuestion[] }>
 }

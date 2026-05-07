@@ -2,11 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { checkHealth } from './api/health'
-import KnowledgeBaseView from './views/KnowledgeBaseView.vue'
-import MaterialImportView from './views/MaterialImportView.vue'
-import KnowledgePointListView from './views/KnowledgePointListView.vue'
-import KnowledgePointDetailView from './views/KnowledgePointDetailView.vue'
-import PracticeView from './views/PracticeView.vue'
 
 const router = useRouter()
 const route = useRoute()
