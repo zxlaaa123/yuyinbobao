@@ -1,6 +1,11 @@
 import httpx
 from .json_parser import extract_json_from_text
-from .prompt_templates import EXTRACT_KNOWLEDGE_POINTS_SYSTEM, build_extract_user_prompt
+from .prompt_templates import (
+    EXTRACT_KNOWLEDGE_POINTS_SYSTEM,
+    GENERATE_QUESTIONS_SYSTEM,
+    build_extract_user_prompt,
+    build_generate_questions_user_prompt,
+)
 
 
 class AIService:
@@ -41,4 +46,33 @@ class AIService:
         result = extract_json_from_text(raw)
         if "knowledge_points" not in result:
             raise ValueError("AI 返回结果缺少 knowledge_points 字段")
+        return result
+
+    async def generate_questions(
+        self,
+        title: str,
+        summary: str,
+        detail: str,
+        exam_points: list[str],
+        confusing_points: list[str],
+        memory_tips: list[str],
+        examples: list[str],
+        question_types: list[str],
+        count: int,
+    ) -> dict:
+        user_prompt = build_generate_questions_user_prompt(
+            title=title,
+            summary=summary,
+            detail=detail,
+            exam_points=exam_points,
+            confusing_points=confusing_points,
+            memory_tips=memory_tips,
+            examples=examples,
+            question_types=question_types,
+            count=count,
+        )
+        raw = await self.chat(GENERATE_QUESTIONS_SYSTEM, user_prompt)
+        result = extract_json_from_text(raw)
+        if "questions" not in result:
+            raise ValueError("AI 返回结果缺少 questions 字段")
         return result

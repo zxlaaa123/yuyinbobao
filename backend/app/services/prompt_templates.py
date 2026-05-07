@@ -57,3 +57,99 @@ def build_extract_user_prompt(knowledge_base_name: str, material_title: str, mat
     }}
   ]
 }}"""
+
+
+GENERATE_QUESTIONS_SYSTEM = """你是一个考试题目生成助手，擅长根据知识点生成适合复习的练习题。
+
+你的任务：
+1. 根据用户提供的知识点生成题目。
+2. 题目必须围绕知识点本身，不要偏题。
+3. 不要编造与知识点无关的信息。
+4. 单选题必须有 A、B、C、D 四个选项，且只有一个正确答案。
+5. 判断题必须使用 true / false 作为答案。
+6. 干扰项要合理，不能明显离谱。
+7. 解析要清楚说明正确原因。
+8. 输出必须严格符合指定 JSON 格式。
+9. 不要输出 Markdown。
+10. 不要输出任何解释性文字。
+11. difficulty 只能是 easy、medium、hard。
+12. question_type 只能使用用户指定的题型。
+
+你必须只返回 JSON，不要返回任何额外文本。"""
+
+
+def build_generate_questions_user_prompt(
+    title: str,
+    summary: str,
+    detail: str,
+    exam_points: list[str],
+    confusing_points: list[str],
+    memory_tips: list[str],
+    examples: list[str],
+    question_types: list[str],
+    count: int,
+) -> str:
+    return f"""请根据下面的知识点生成练习题。
+
+知识点标题：
+{title}
+
+简短解释：
+{summary}
+
+详细解释：
+{detail}
+
+高频考点：
+{', '.join(exam_points)}
+
+易混点：
+{', '.join(confusing_points)}
+
+记忆方法：
+{', '.join(memory_tips)}
+
+示例：
+{', '.join(examples)}
+
+要求：
+1. 生成 {count} 道题。
+2. 题型只能从以下列表中选择：{', '.join(question_types)}。
+3. 如果包含 single_choice，则单选题必须有 A、B、C、D 四个选项。
+4. 如果包含 true_false，则判断题必须使用 true / false。
+5. 题目要适合考试复习。
+6. 题目不能脱离知识点。
+7. 解析要具体，不要只写"因为正确"。
+8. difficulty 只能是 easy、medium、hard。
+9. 必须只返回 JSON，不要返回 Markdown。
+
+返回 JSON 格式必须如下：
+
+{{
+  "questions": [
+    {{
+      "question_type": "single_choice",
+      "stem": "题干",
+      "options": [
+        {{"key": "A", "text": "选项A"}},
+        {{"key": "B", "text": "选项B"}},
+        {{"key": "C", "text": "选项C"}},
+        {{"key": "D", "text": "选项D"}}
+      ],
+      "answer": "A",
+      "analysis": "解析",
+      "difficulty": "medium"
+    }},
+    {{
+      "question_type": "true_false",
+      "stem": "判断题题干",
+      "options": [
+        {{"key": "true", "text": "正确"}},
+        {{"key": "false", "text": "错误"}}
+      ],
+      "answer": "true",
+      "analysis": "解析",
+      "difficulty": "easy"
+    }}
+  ]
+}}"""

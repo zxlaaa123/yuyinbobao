@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoint, updateKnowledgePoint, deleteKnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint'
+import { generateQuestions } from '../api/question'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,6 +12,36 @@ const kp = ref<KnowledgePoint | null>(null)
 const loading = ref(false)
 const editing = ref(false)
 const editForm = reactive<KnowledgePointUpdate>({})
+
+// 生成题目
+const genDialogVisible = ref(false)
+const genCount = ref(5)
+const genTypes = ref<string[]>(['single_choice'])
+const genLoading = ref(false)
+const genResult = ref<{ created_count: number; skipped_count: number } | null>(null)
+
+async function handleGenerateQuestions() {
+  if (!kp.value) return
+  if (genCount.value < 1 || genCount.value > 20) {
+    ElMessage.warning('题目数量必须在 1 到 20 之间')
+    return
+  }
+  if (genTypes.value.length === 0) {
+    ElMessage.warning('请至少选择一种题型')
+    return
+  }
+  genLoading.value = true
+  genResult.value = null
+  try {
+    const result = await generateQuestions(kp.value.id, genTypes.value, genCount.value)
+    genResult.value = result
+    ElMessage.success(`已生成 ${result.created_count} 道题`)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '生成失败，请重试')
+  } finally {
+    genLoading.value = false
+  }
+}
 
 async function fetchData() {
   loading.value = true
@@ -102,6 +133,7 @@ onMounted(fetchData)
       <div class="top-bar">
         <el-button @click="router.push('/knowledge-points')">← 返回列表</el-button>
         <div class="actions">
+          <el-button @click="genDialogVisible = true">生成题目</el-button>
           <el-button v-if="!editing" @click="startEdit">编辑</el-button>
           <el-button v-if="editing" @click="cancelEdit">取消</el-button>
           <el-button v-if="editing" type="primary" @click="handleSave">保存</el-button>
@@ -228,6 +260,36 @@ onMounted(fetchData)
         </el-form>
       </div>
     </template>
+  </div>
+    <!-- 生成题目弹窗 -->
+    <el-dialog v-model="genDialogVisible" title="生成题目" width="480px">
+      <el-form label-position="top">
+        <el-form-item label="题型">
+          <el-checkbox-group v-model="genTypes">
+            <el-checkbox label="single_choice">单选题</el-checkbox>
+            <el-checkbox label="true_false">判断题</el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+        <el-form-item label="题目数量">
+          <el-input-number v-model="genCount" :min="1" :max="20" />
+        </el-form-item>
+      </el-form>
+
+      <div v-if="genLoading" class="gen-loading">
+        <div class="spinner"></div>
+        <p>正在调用 AI 生成题目，请稍候...</p>
+      </div>
+
+      <div v-else-if="genResult" class="gen-result">
+        <p>已生成 <strong>{{ genResult.created_count }}</strong> 道题</p>
+        <p v-if="genResult.skipped_count" class="skipped">跳过 {{ genResult.skipped_count }} 道不合格题目</p>
+      </div>
+
+      <template #footer>
+        <el-button @click="genDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="genLoading" @click="handleGenerateQuestions">生成</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -365,5 +427,42 @@ onMounted(fetchData)
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.gen-loading {
+  text-align: center;
+  padding: 30px 0;
+  color: #667085;
+}
+
+.gen-loading .spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #e6eaf2;
+  border-top-color: #4f7cff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 10px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.gen-result {
+  text-align: center;
+  padding: 20px 0;
+  font-size: 15px;
+}
+
+.gen-result strong {
+  color: #4f7cff;
+  font-size: 18px;
+}
+
+.gen-result .skipped {
+  color: #667085;
+  font-size: 13px;
+  margin-top: 6px;
 }
 </style>

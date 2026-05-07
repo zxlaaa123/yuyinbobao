@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+import json
 from ...core.database import get_db
 from ...core.config import get_setting, AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_TEMPERATURE, AI_TIMEOUT
 from ...models.material import Material
 from ...models.knowledge_point import KnowledgePoint
+from ...models.question import Question
 from ...services.ai_service import AIService
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -20,6 +22,23 @@ def _get_ai_service(db: Session) -> AIService:
     if not base_url:
         raise HTTPException(status_code=400, detail="AI Base URL 未配置，请先到设置页配置")
     return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout)
+
+
+def _dump_json(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _load_json(value: str | None) -> list:
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except Exception:
+        return []
 
 
 @router.post("/extract-points")
@@ -80,20 +99,118 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
     }
 
 
-def _dump_json(value) -> str | None:
-    import json
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=False)
+@router.post("/generate-questions")
+async def generate_questions(body: dict, db: Session = Depends(get_db)):
+    kp_id = body.get("knowledge_point_id")
+    if not kp_id:
+        raise HTTPException(status_code=400, detail="缺少 knowledge_point_id")
 
+    question_types = body.get("question_types", ["single_choice"])
+    count = body.get("count", 5)
 
-def _load_json(value: str | None) -> list:
-    import json
-    if not value:
-        return []
+    if not isinstance(count, int) or count < 1 or count > 20:
+        raise HTTPException(status_code=400, detail="题目数量必须在 1 到 20 之间")
+
+    valid_types = {"single_choice", "true_false"}
+    for qt in question_types:
+        if qt not in valid_types:
+            raise HTTPException(status_code=400, detail=f"不支持的题型：{qt}")
+
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+    if not kp:
+        raise HTTPException(status_code=404, detail="知识点不存在")
+
+    ai_service = _get_ai_service(db)
     try:
-        return json.loads(value)
-    except Exception:
-        return []
+        result = await ai_service.generate_questions(
+            title=kp.title,
+            summary=kp.summary or "",
+            detail=kp.detail or "",
+            exam_points=_load_json(kp.exam_points),
+            confusing_points=_load_json(kp.confusing_points),
+            memory_tips=_load_json(kp.memory_tips),
+            examples=_load_json(kp.examples),
+            question_types=question_types,
+            count=count,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI 调用失败：{str(e)}")
+
+    raw_questions = result.get("questions", [])
+    if not raw_questions:
+        raise HTTPException(status_code=500, detail="AI 未返回有效题目")
+
+    created = []
+    skipped = 0
+    for q in raw_questions:
+        qt = q.get("question_type")
+        stem = q.get("stem", "").strip()
+        answer = q.get("answer", "").strip()
+        options = q.get("options", [])
+
+        if not stem or not answer:
+            skipped += 1
+            continue
+
+        # 校验单选题
+        if qt == "single_choice":
+            keys = {o.get("key") for o in options}
+            if keys != {"A", "B", "C", "D"}:
+                skipped += 1
+                continue
+            if answer not in ("A", "B", "C", "D"):
+                skipped += 1
+                continue
+
+        # 校验判断题
+        elif qt == "true_false":
+            keys = {o.get("key") for o in options}
+            if keys != {"true", "false"}:
+                skipped += 1
+                continue
+            if answer not in ("true", "false"):
+                skipped += 1
+                continue
+        else:
+            skipped += 1
+            continue
+
+        difficulty = q.get("difficulty", "medium")
+        if difficulty not in ("easy", "medium", "hard"):
+            difficulty = "medium"
+
+        question = Question(
+            knowledge_base_id=kp.knowledge_base_id,
+            knowledge_point_id=kp.id,
+            question_type=qt,
+            stem=stem,
+            options=json.dumps(options, ensure_ascii=False),
+            answer=answer,
+            analysis=q.get("analysis", ""),
+            difficulty=difficulty,
+        )
+        db.add(question)
+        created.append(question)
+
+    if not created:
+        raise HTTPException(status_code=500, detail="AI 返回的题目格式不符合要求，请重试")
+
+    db.commit()
+
+    return {
+        "knowledge_point_id": kp.id,
+        "created_count": len(created),
+        "skipped_count": skipped,
+        "questions": [
+            {
+                "id": q.id,
+                "question_type": q.question_type,
+                "stem": q.stem,
+                "answer": q.answer,
+                "difficulty": q.difficulty,
+            }
+            for q in created
+        ],
+    }
