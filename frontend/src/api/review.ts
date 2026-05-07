@@ -3,6 +3,8 @@ import request from './request'
 export interface ReviewTask {
   id: number
   knowledge_point_id: number
+  kp_title: string
+  kp_summary: string
   source: string
   status: string
   difficulty: string

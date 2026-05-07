@@ -13,19 +13,58 @@ def get_tasks(
     knowledge_base_id: int | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> list[ReviewTask]:
-    query = db.query(ReviewTask)
+) -> list[dict]:
+    query = db.query(ReviewTask, KnowledgePoint).join(
+        KnowledgePoint, ReviewTask.knowledge_point_id == KnowledgePoint.id
+    )
     if status:
         query = query.filter(ReviewTask.status == status)
     if knowledge_base_id:
-        query = query.join(KnowledgePoint, ReviewTask.knowledge_point_id == KnowledgePoint.id).filter(
-            KnowledgePoint.knowledge_base_id == knowledge_base_id
-        )
-    return query.order_by(ReviewTask.scheduled_at.asc().nullslast(), ReviewTask.created_at.asc()).offset(offset).limit(limit).all()
+        query = query.filter(KnowledgePoint.knowledge_base_id == knowledge_base_id)
+    rows = query.order_by(
+        ReviewTask.scheduled_at.asc().nullslast(), ReviewTask.created_at.asc()
+    ).offset(offset).limit(limit).all()
+
+    return [
+        {
+            "id": task.id,
+            "knowledge_point_id": task.knowledge_point_id,
+            "kp_title": kp.title,
+            "kp_summary": kp.summary or "",
+            "source": task.source,
+            "status": task.status,
+            "difficulty": task.difficulty,
+            "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "snooze_count": task.snooze_count,
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+        }
+        for task, kp in rows
+    ]
 
 
-def get_task_by_id(db: Session, task_id: int) -> ReviewTask | None:
-    return db.query(ReviewTask).filter(ReviewTask.id == task_id).first()
+def get_task_by_id(db: Session, task_id: int) -> dict | None:
+    row = db.query(ReviewTask, KnowledgePoint).join(
+        KnowledgePoint, ReviewTask.knowledge_point_id == KnowledgePoint.id
+    ).filter(ReviewTask.id == task_id).first()
+    if not row:
+        return None
+    task, kp = row
+    return {
+        "id": task.id,
+        "knowledge_point_id": task.knowledge_point_id,
+        "kp_title": kp.title,
+        "kp_summary": kp.summary or "",
+        "source": task.source,
+        "status": task.status,
+        "difficulty": task.difficulty,
+        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+        "snooze_count": task.snooze_count,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+    }
 
 
 def delete_task(db: Session, task_id: int) -> bool:

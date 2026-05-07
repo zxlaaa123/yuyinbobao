@@ -10,7 +10,9 @@ import {
 } from '../api/review'
 import { generateDailyReviewAudio } from '../api/audio'
 import type { ReviewTask } from '../api/review'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const tasks = ref<ReviewTask[]>([])
 const loading = ref(false)
 const generateLoading = ref(false)
@@ -127,6 +129,10 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function goDetail(kpId: number) {
+  router.push(`/knowledge-points/${kpId}`)
+}
+
 onMounted(fetchTasks)
 </script>
 
@@ -167,9 +173,9 @@ onMounted(fetchTasks)
     <!-- 筛选 -->
     <div class="filters">
       <el-radio-group v-model="filterStatus">
-        <el-radio-button label="">全部</el-radio-button>
-        <el-radio-button label="pending">待复习</el-radio-button>
-        <el-radio-button label="completed">已完成</el-radio-button>
+        <el-radio-button value="">全部</el-radio-button>
+        <el-radio-button value="pending">待复习</el-radio-button>
+        <el-radio-button value="completed">已完成</el-radio-button>
       </el-radio-group>
     </div>
 
@@ -191,13 +197,16 @@ onMounted(fetchTasks)
       >
         <div class="task-main">
           <div class="task-info">
-            <div class="task-kp-id">知识点 #{{ task.knowledge_point_id }}</div>
+            <div class="task-title" @click="goDetail(task.knowledge_point_id)">
+              {{ task.kp_title || '知识点 #' + task.knowledge_point_id }}
+            </div>
             <div class="task-badges">
               <span class="badge source">{{ sourceLabel(task.source) }}</span>
               <span class="badge difficulty" :class="task.difficulty">{{ difficultyLabel(task.difficulty) }}</span>
               <span class="badge status" :class="task.status">{{ task.status === 'completed' ? '已完成' : '待复习' }}</span>
             </div>
           </div>
+          <div class="task-summary" v-if="task.kp_summary">{{ task.kp_summary }}</div>
           <div class="task-meta">
             <span>创建于 {{ formatDate(task.created_at) }}</span>
             <span v-if="task.scheduled_at"> · 计划 {{ formatDate(task.scheduled_at) }}</span>
@@ -352,10 +361,26 @@ onMounted(fetchTasks)
   gap: 12px;
 }
 
-.task-kp-id {
+.task-title {
   font-size: 15px;
   font-weight: 600;
-  color: #182033;
+  color: #315de6;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.task-title:hover {
+  text-decoration: underline;
+}
+
+.task-summary {
+  font-size: 13px;
+  color: #667085;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .task-badges {

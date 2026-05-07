@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
 from ...core.database import get_db
+from ...models.knowledge_point import KnowledgePoint
 from ...services.review_service import (
     get_tasks,
     get_task_by_id,
@@ -14,21 +15,6 @@ from ...services.review_service import (
 router = APIRouter(prefix="/api/review", tags=["review"])
 
 
-def _task_to_dict(task) -> dict:
-    return {
-        "id": task.id,
-        "knowledge_point_id": task.knowledge_point_id,
-        "source": task.source,
-        "status": task.status,
-        "difficulty": task.difficulty,
-        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
-        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-        "snooze_count": task.snooze_count,
-        "created_at": task.created_at.isoformat() if task.created_at else None,
-        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
-    }
-
-
 @router.get("/tasks")
 def list_tasks(
     status: str | None = Query(None, description="筛选状态: pending / completed"),
@@ -37,8 +23,7 @@ def list_tasks(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
 ):
-    tasks = get_tasks(db, status=status, knowledge_base_id=knowledge_base_id, limit=limit, offset=offset)
-    return [_task_to_dict(t) for t in tasks]
+    return get_tasks(db, status=status, knowledge_base_id=knowledge_base_id, limit=limit, offset=offset)
 
 
 @router.get("/tasks/{task_id}")
@@ -46,7 +31,7 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
     task = get_task_by_id(db, task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
-    return _task_to_dict(task)
+    return task
 
 
 @router.post("/tasks/generate")
@@ -70,7 +55,21 @@ def complete(
         task = complete_task(db, task_id, quality=quality)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _task_to_dict(task)
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == task.knowledge_point_id).first()
+    return {
+        "id": task.id,
+        "knowledge_point_id": task.knowledge_point_id,
+        "kp_title": kp.title if kp else "",
+        "kp_summary": kp.summary or "" if kp else "",
+        "source": task.source,
+        "status": task.status,
+        "difficulty": task.difficulty,
+        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+        "snooze_count": task.snooze_count,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+    }
 
 
 @router.post("/tasks/{task_id}/snooze")
@@ -83,7 +82,21 @@ def snooze(
         task = snooze_task(db, task_id, hours=hours)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _task_to_dict(task)
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == task.knowledge_point_id).first()
+    return {
+        "id": task.id,
+        "knowledge_point_id": task.knowledge_point_id,
+        "kp_title": kp.title if kp else "",
+        "kp_summary": kp.summary or "" if kp else "",
+        "source": task.source,
+        "status": task.status,
+        "difficulty": task.difficulty,
+        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+        "snooze_count": task.snooze_count,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+    }
 
 
 @router.delete("/tasks/{task_id}")
