@@ -282,6 +282,17 @@ onMounted(fetchData)
         <div v-else-if="genResult" class="gen-result">
           <p>已生成 <strong>{{ genResult.created_count }}</strong> 道题</p>
           <p v-if="genResult.skipped_count" class="skipped">跳过 {{ genResult.skipped_count }} 道不合格题目</p>
+          <div class="question-preview">
+            <div v-for="q in genResult.questions" :key="q.id" class="q-item">
+              <div class="q-stem">{{ q.stem }}</div>
+              <div class="q-options">
+                <span v-for="opt in (q.options || [])" :key="opt.key" class="q-opt" :class="{ answer: opt.key === q.answer }">
+                  {{ opt.key }}. {{ opt.text }}
+                </span>
+              </div>
+              <div class="q-answer">答案：{{ q.answer }} | 难度：{{ q.difficulty }}</div>
+            </div>
+          </div>
         </div>
 
         <template #footer>
@@ -466,6 +477,53 @@ onMounted(fetchData)
   color: #667085;
   font-size: 13px;
   margin-top: 6px;
+}
+
+.question-preview {
+  margin-top: 16px;
+  text-align: left;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.q-item {
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: #f8fbff;
+}
+
+.q-stem {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #182033;
+}
+
+.q-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.q-opt {
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: #344054;
+}
+
+.q-opt.answer {
+  background: #e9fbf5;
+  color: #087a59;
+  font-weight: 600;
+}
+
+.q-answer {
+  font-size: 12px;
+  color: #667085;
 }
 
 .empty {

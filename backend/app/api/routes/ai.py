@@ -208,7 +208,9 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
                 "id": q.id,
                 "question_type": q.question_type,
                 "stem": q.stem,
+                "options": json.loads(q.options) if q.options else [],
                 "answer": q.answer,
+                "analysis": q.analysis,
                 "difficulty": q.difficulty,
             }
             for q in created
