@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { checkHealth } from './api/health'
 import KnowledgeBaseView from './views/KnowledgeBaseView.vue'
+import MaterialImportView from './views/MaterialImportView.vue'
 
 const backendStatus = ref<'loading' | 'ok' | 'error'>('loading')
 const currentView = ref('dashboard')
@@ -22,6 +23,7 @@ onMounted(() => {
 const menuItems = [
   { key: 'dashboard', label: '首页', icon: '🏠' },
   { key: 'knowledge-bases', label: '知识库', icon: '📚' },
+  { key: 'materials/import', label: '资料导入', icon: '📝' },
 ]
 </script>
 
@@ -71,6 +73,9 @@ const menuItems = [
 
       <!-- 知识库页面 -->
       <KnowledgeBaseView v-else-if="currentView === 'knowledge-bases'" />
+
+      <!-- 资料导入页面 -->
+      <MaterialImportView v-else-if="currentView === 'materials/import'" />
     </main>
   </div>
 </template>

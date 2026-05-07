@@ -1,0 +1,42 @@
+import request from './request'
+import type { KnowledgeBase } from './knowledgeBase'
+
+export interface Material {
+  id: number
+  knowledge_base_id: number
+  knowledge_base_name: string
+  title: string
+  content: string
+  source: string | null
+  note: string | null
+  material_type: string
+  content_length: number
+  extracted_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface MaterialCreate {
+  knowledge_base_id: number
+  title: string
+  content: string
+  source?: string
+  note?: string
+}
+
+export function getMaterials(knowledgeBaseId?: number) {
+  const params = knowledgeBaseId ? `?knowledge_base_id=${knowledgeBaseId}` : ''
+  return request.get(`/api/materials${params}`) as Promise<Material[]>
+}
+
+export function getMaterial(id: number) {
+  return request.get(`/api/materials/${id}`) as Promise<Material>
+}
+
+export function createMaterial(data: MaterialCreate) {
+  return request.post('/api/materials', data) as Promise<Material>
+}
+
+export function getKnowledgeBasesForSelect() {
+  return request.get('/api/knowledge-bases') as Promise<KnowledgeBase[]>
+}
