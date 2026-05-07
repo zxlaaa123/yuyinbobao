@@ -44,11 +44,14 @@ export function getKnowledgeBasesForSelect() {
 }
 
 export interface ExtractResult {
-  material: { id: number; title: string }
+  material_id: number
+  split_used: boolean
+  segment_count: number
   created_count: number
+  skipped_count: number
   knowledge_points: { id: number; title: string; importance: string; tags: string[] }[]
 }
 
-export function importAndExtract(data: MaterialCreate) {
+export function importAndExtract(data: MaterialCreate & { enable_split?: boolean }) {
   return request.post('/api/materials/import-and-extract', data) as Promise<ExtractResult>
 }

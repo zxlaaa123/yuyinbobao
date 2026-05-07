@@ -10,6 +10,7 @@ const form = reactive({
   content: '',
   source: '',
   note: '',
+  enable_split: false,
 })
 
 const knowledgeBases = ref<KnowledgeBase[]>([])
@@ -72,9 +73,11 @@ async function handleSaveAndExtract() {
       content: form.content,
       source: form.source.trim() || undefined,
       note: form.note.trim() || undefined,
+      enable_split: form.enable_split,
     })
     extractResult.value = result
-    ElMessage.success(`成功提取 ${result.created_count} 个知识点`)
+    const splitInfo = result.split_used ? `（分 ${result.segment_count} 段处理）` : ''
+    ElMessage.success(`成功提取 ${result.created_count} 个知识点${splitInfo}`)
   } catch (e: any) {
     ElMessage.error(e.response?.data?.detail || 'AI 提取失败，请重试')
   } finally {
@@ -88,6 +91,7 @@ function resetForm() {
   form.content = ''
   form.source = ''
   form.note = ''
+  form.enable_split = false
   extractResult.value = null
 }
 
@@ -133,7 +137,10 @@ onMounted(fetchKnowledgeBases)
             placeholder="在此粘贴学习资料内容..."
             resize="vertical"
           />
-          <div class="tip">建议单次导入 5000～10000 字以内。内容太长可以分段导入。</div>
+          <div class="tip">
+          建议单次导入 5000～10000 字以内。内容太长可开启分段提取。
+          <el-checkbox v-model="form.enable_split" style="margin-left: 8px">长文本分段提取</el-checkbox>
+        </div>
         </div>
 
         <div class="form-item">
@@ -163,6 +170,12 @@ onMounted(fetchKnowledgeBases)
         <div v-else-if="extractResult" class="result-content">
           <div class="result-summary">
             本次提取 <strong>{{ extractResult.created_count }}</strong> 个知识点
+            <span v-if="extractResult.skipped_count > 0" class="skipped-hint">
+              跳过 {{ extractResult.skipped_count }} 个重复/无效
+            </span>
+          </div>
+          <div v-if="extractResult.split_used" class="split-info">
+            📄 长文本已分段处理：分 <strong>{{ extractResult.segment_count }}</strong> 段提取
           </div>
           <div class="kp-list">
             <div v-for="kp in extractResult.knowledge_points" :key="kp.id" class="kp-item">
@@ -291,6 +304,21 @@ onMounted(fetchKnowledgeBases)
   border-radius: 12px;
   font-size: 14px;
   color: #315de6;
+  margin-bottom: 12px;
+}
+
+.skipped-hint {
+  margin-left: 8px;
+  color: #a06000;
+  font-size: 13px;
+}
+
+.split-info {
+  padding: 8px 16px;
+  background: #fff8e7;
+  border-radius: 12px;
+  font-size: 13px;
+  color: #a06000;
   margin-bottom: 16px;
 }
 
