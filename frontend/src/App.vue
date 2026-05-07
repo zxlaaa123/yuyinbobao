@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { checkHealth } from './api/health'
 import KnowledgeBaseView from './views/KnowledgeBaseView.vue'
 import MaterialImportView from './views/MaterialImportView.vue'
+import KnowledgePointListView from './views/KnowledgePointListView.vue'
+import KnowledgePointDetailView from './views/KnowledgePointDetailView.vue'
 
+const router = useRouter()
+const route = useRoute()
 const backendStatus = ref<'loading' | 'ok' | 'error'>('loading')
-const currentView = ref('dashboard')
 
 async function fetchHealth() {
   try {
@@ -21,9 +25,10 @@ onMounted(() => {
 })
 
 const menuItems = [
-  { key: 'dashboard', label: '首页', icon: '🏠' },
-  { key: 'knowledge-bases', label: '知识库', icon: '📚' },
-  { key: 'materials/import', label: '资料导入', icon: '📝' },
+  { key: '/dashboard', label: '首页', icon: '🏠' },
+  { key: '/knowledge-bases', label: '知识库', icon: '📚' },
+  { key: '/materials/import', label: '资料导入', icon: '📝' },
+  { key: '/knowledge-points', label: '知识点', icon: '🧠' },
 ]
 </script>
 
@@ -42,8 +47,8 @@ const menuItems = [
         <button
           v-for="item in menuItems"
           :key="item.key"
-          :class="{ active: currentView === item.key }"
-          @click="currentView = item.key"
+          :class="{ active: route.path === item.key || (item.key !== '/dashboard' && route.path.startsWith(item.key)) }"
+          @click="router.push(item.key)"
         >
           <span class="icon">{{ item.icon }}</span>
           {{ item.label }}
@@ -63,19 +68,8 @@ const menuItems = [
         </div>
       </div>
 
-      <!-- 首页 -->
-      <div v-if="currentView === 'dashboard'" class="dashboard">
-        <div class="hero-card">
-          <h1>AI 知识点学习与音频播报系统</h1>
-          <p>本地学习辅助工具</p>
-        </div>
-      </div>
-
-      <!-- 知识库页面 -->
-      <KnowledgeBaseView v-else-if="currentView === 'knowledge-bases'" />
-
-      <!-- 资料导入页面 -->
-      <MaterialImportView v-else-if="currentView === 'materials/import'" />
+      <!-- 路由内容 -->
+      <router-view />
     </main>
   </div>
 </template>
@@ -87,7 +81,6 @@ const menuItems = [
   min-height: 100vh;
 }
 
-/* 左侧菜单 */
 .sidebar {
   position: sticky;
   top: 0;
@@ -170,7 +163,6 @@ const menuItems = [
   font-size: 16px;
 }
 
-/* 右侧内容 */
 .main {
   padding: 24px 30px 42px;
   min-width: 0;
@@ -236,40 +228,5 @@ const menuItems = [
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
-}
-
-/* 首页 */
-.dashboard {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 100px);
-}
-
-.hero-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
-  border-radius: 24px;
-  box-shadow: 0 18px 45px rgba(25, 36, 70, 0.09);
-  padding: 60px 48px;
-  text-align: center;
-  max-width: 560px;
-  width: 100%;
-}
-
-.hero-card h1 {
-  font-size: 28px;
-  letter-spacing: -0.04em;
-  margin: 0 0 12px;
-  background: linear-gradient(135deg, #4f7cff, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.hero-card p {
-  margin: 0;
-  color: #667085;
-  font-size: 16px;
 }
 </style>
