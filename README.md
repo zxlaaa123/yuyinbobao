@@ -55,6 +55,7 @@ ai-study-cast/
 - [x] 阶段 7：AI 知识点提取（extract-points + import-and-extract）
 - [x] 阶段 8：知识点页面（列表 + 详情 + 编辑 + 删除）
 - [x] 阶段 9：AI 题目生成（单选题 + 判断题）
+- [x] 阶段 10：刷题练习（答题 + 解析 + 记录）
 
 ## 快速启动
 
