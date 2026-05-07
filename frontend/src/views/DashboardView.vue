@@ -3,14 +3,18 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getDashboardSummary } from '../api/dashboard'
 import type { DashboardSummary } from '../api/dashboard'
-import { getStatsOverview } from '../api/stats'
-import type { StatsOverview } from '../api/stats'
+import { getStatsOverview, getKnowledgeBaseStats, getStatsTrends } from '../api/stats'
+import type { StatsOverview, KnowledgeBaseStats, TrendItem } from '../api/stats'
 
 const router = useRouter()
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const v2Stats = ref<StatsOverview | null>(null)
 const v2Loading = ref(true)
+const kbStats = ref<KnowledgeBaseStats[]>([])
+const kbLoading = ref(true)
+const trends = ref<TrendItem[]>([])
+const trendsLoading = ref(true)
 
 const stats = [
   { key: 'knowledge_base_count', label: '知识库', icon: '📚', color: 0 },
@@ -48,13 +52,40 @@ async function fetchV2Stats() {
   }
 }
 
+async function fetchKbStats() {
+  try {
+    kbStats.value = await getKnowledgeBaseStats()
+  } catch {
+    kbStats.value = []
+  } finally {
+    kbLoading.value = false
+  }
+}
+
+async function fetchTrends() {
+  try {
+    trends.value = await getStatsTrends(7)
+  } catch {
+    trends.value = []
+  } finally {
+    trendsLoading.value = false
+  }
+}
+
 function goTo(path: string) {
   router.push(path)
+}
+
+function formatTrendDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
 onMounted(() => {
   fetchSummary()
   fetchV2Stats()
+  fetchKbStats()
+  fetchTrends()
 })
 </script>
 
@@ -106,7 +137,17 @@ onMounted(() => {
         <div class="v2-card" @click="goTo('/wrong-questions')" style="cursor: pointer">
           <div class="v2-label">待复习错题</div>
           <div class="v2-value accent-red">{{ v2Stats.pending_review }}</div>
-          <div class="v2-sub">共 {{ v2Stats.wrong_total }} 道错题</div>
+          <div class="v2-sub">已掌握 {{ v2Stats.mastered_count }} / 共 {{ v2Stats.wrong_total }}</div>
+        </div>
+        <div class="v2-card" @click="goTo('/review')" style="cursor: pointer">
+          <div class="v2-label">复习任务</div>
+          <div class="v2-value">{{ v2Stats.review_pending }}</div>
+          <div class="v2-sub">已完成 {{ v2Stats.review_completed }}</div>
+        </div>
+        <div class="v2-card">
+          <div class="v2-label">知识点覆盖</div>
+          <div class="v2-value">{{ v2Stats.kp_coverage }}%</div>
+          <div class="v2-sub">{{ v2Stats.kp_with_questions }}/{{ v2Stats.total_knowledge_points }} 有题目</div>
         </div>
         <div class="v2-card" @click="goTo('/audio')" style="cursor: pointer">
           <div class="v2-label">音频</div>
@@ -117,6 +158,48 @@ onMounted(() => {
       </div>
       <div v-else-if="!v2Stats && !v2Loading" class="v2-empty">
         暂无统计数据，开始刷题后这里会显示学习进度
+      </div>
+    </div>
+
+    <!-- 知识库掌握度 -->
+    <div class="v2-stats" v-if="!kbLoading && kbStats.length > 0">
+      <div class="section-header">
+        <h3>📚 知识库掌握度</h3>
+      </div>
+      <div class="kb-mastery-list">
+        <div v-for="kb in kbStats" :key="kb.id" class="kb-mastery-card">
+          <div class="kb-mastery-header">
+            <span class="kb-name">{{ kb.name }}</span>
+            <span class="kb-mastery-value" :class="kb.mastery >= 60 ? 'good' : kb.mastery >= 30 ? 'medium' : 'low'">
+              {{ kb.mastery }}%
+            </span>
+          </div>
+          <div class="kb-mastery-bar">
+            <div class="kb-mastery-fill" :style="{ width: kb.mastery + '%' }"></div>
+          </div>
+          <div class="kb-mastery-detail">
+            <span>正确率 {{ kb.accuracy }}%</span>
+            <span>题目 {{ kb.question_count }}</span>
+            <span>错题 {{ kb.pending_wrong }}</span>
+            <span>复习 {{ kb.review_pending }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 天趋势 -->
+    <div class="v2-stats" v-if="!trendsLoading && trends.length > 0">
+      <div class="section-header">
+        <h3>📈 7 天答题趋势</h3>
+      </div>
+      <div class="trends-grid">
+        <div v-for="t in trends" :key="t.date" class="trend-card">
+          <div class="trend-bar-wrap">
+            <div class="trend-bar" :style="{ height: Math.max(t.answers * 3, 4) + 'px' }"></div>
+          </div>
+          <div class="trend-answers">{{ t.answers }}</div>
+          <div class="trend-label">{{ formatTrendDate(t.date) }}</div>
+        </div>
       </div>
     </div>
   </div>
@@ -350,12 +433,111 @@ onMounted(() => {
   font-size: 14px;
 }
 
+/* 知识库掌握度 */
+.kb-mastery-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kb-mastery-card {
+  background: #f8fbff;
+  border: 1px solid #e6eaf2;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-mastery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kb-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #182033;
+}
+
+.kb-mastery-value {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.kb-mastery-value.good { color: #087a59; }
+.kb-mastery-value.medium { color: #a06000; }
+.kb-mastery-value.low { color: #dc2626; }
+
+.kb-mastery-bar {
+  height: 8px;
+  background: #e6eaf2;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.kb-mastery-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f7cff, #7c3aed);
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+
+.kb-mastery-detail {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #667085;
+}
+
+/* 7 天趋势 */
+.trends-grid {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 16px 0 4px;
+}
+
+.trend-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.trend-bar-wrap {
+  height: 60px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.trend-bar {
+  width: 24px;
+  background: linear-gradient(180deg, #4f7cff, #c7d2fe);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+}
+
+.trend-answers {
+  font-size: 12px;
+  font-weight: 600;
+  color: #182033;
+}
+
+.trend-label {
+  font-size: 11px;
+  color: #667085;
+}
+
 @media (max-width: 900px) {
   .stats-grid {
     grid-template-columns: repeat(3, 1fr);
   }
   .v2-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
