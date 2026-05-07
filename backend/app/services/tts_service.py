@@ -4,6 +4,65 @@ import base64
 from .audio_service import generate_audio_filename, save_audio_file, build_file_url
 
 
+def build_text_from_knowledge_points(kps: list) -> str:
+    """多个知识点合集播报文本"""
+    parts = []
+    parts.append(f"接下来为您播放 {len(kps)} 个知识点的合集复习音频。")
+    parts.append("")
+    for i, kp in enumerate(kps, 1):
+        parts.append(f"第 {i} 个知识点：{kp.title}。")
+        if kp.summary:
+            parts.append(f"简要解释：{kp.summary}")
+        if kp.detail:
+            parts.append(f"详细说明：{kp.detail}")
+        if kp.exam_points:
+            import json
+            try:
+                points = json.loads(kp.exam_points)
+                if points:
+                    parts.append("高频考点包括：")
+                    for j, p in enumerate(points, 1):
+                        parts.append(f"第{j}，{p}")
+            except Exception:
+                pass
+        if kp.confusing_points:
+            import json
+            try:
+                points = json.loads(kp.confusing_points)
+                if points:
+                    parts.append("易混点：")
+                    for p in points:
+                        parts.append(p)
+            except Exception:
+                pass
+        if kp.memory_tips:
+            import json
+            try:
+                tips = json.loads(kp.memory_tips)
+                if tips:
+                    parts.append("记忆方法：")
+                    for t in tips:
+                        parts.append(t)
+            except Exception:
+                pass
+        if kp.examples:
+            import json
+            try:
+                examples = json.loads(kp.examples)
+                if examples:
+                    parts.append("例子：")
+                    for e in examples:
+                        parts.append(e)
+            except Exception:
+                pass
+        if i < len(kps):
+            parts.append("")
+            parts.append("接下来是第 {} 个知识点。".format(i + 1))
+        parts.append("")
+    parts.append("以上是本次合集复习的全部内容，请继续加油。")
+    return "\n\n".join(parts)
+
+
 def build_text_from_knowledge_point(kp) -> str:
     parts = []
     parts.append(f"知识点：{kp.title}。")

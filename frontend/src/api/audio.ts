@@ -26,6 +26,18 @@ export function generateAudio(knowledgePointId: number) {
   }>
 }
 
+export function generateBatchAudio(knowledgePointIds: number[]) {
+  return request.post('/api/tts/generate-batch', {
+    knowledge_point_ids: knowledgePointIds,
+  }) as Promise<{
+    audio_id: number
+    title: string
+    knowledge_point_count: number
+    status: string
+    file_url: string
+  }>
+}
+
 export function getAudioFiles(params?: {
   knowledge_base_id?: number
   knowledge_point_id?: number

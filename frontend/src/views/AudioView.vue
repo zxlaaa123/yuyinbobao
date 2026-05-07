@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAudioFiles, deleteAudioFile } from '../api/audio'
 import { getKnowledgeBasesForSelect } from '../api/material'
@@ -11,12 +11,23 @@ const knowledgeBases = ref<KnowledgeBase[]>([])
 const loading = ref(false)
 const filterKB = ref<number | undefined>()
 const filterStatus = ref<string | undefined>()
+const filterType = ref<string | undefined>()
 
 function getAudioUrl(fileUrl: string | null): string {
   if (!fileUrl) return ''
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
   return `${baseUrl}${fileUrl}`
 }
+
+const filteredAudio = computed(() => {
+  let list = audioFiles.value
+  if (filterType.value === 'single') {
+    list = list.filter((a) => !a.title.startsWith('合集'))
+  } else if (filterType.value === 'collection') {
+    list = list.filter((a) => a.title.startsWith('合集'))
+  }
+  return list
+})
 
 async function fetchData() {
   loading.value = true
@@ -82,16 +93,20 @@ onMounted(async () => {
         <el-option label="失败" value="failed" />
         <el-option label="生成中" value="pending" />
       </el-select>
+      <el-select v-model="filterType" placeholder="全部类型" clearable style="width: 160px" @change="fetchData">
+        <el-option label="单个知识点" value="single" />
+        <el-option label="合集音频" value="collection" />
+      </el-select>
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!loading && audioFiles.length === 0" class="empty">
+    <div v-if="!loading && filteredAudio.length === 0" class="empty">
       暂无音频，请在知识点详情页生成音频。
     </div>
 
     <!-- 音频列表 -->
     <div v-else class="audio-list">
-      <div v-for="audio in audioFiles" :key="audio.id" class="audio-card">
+      <div v-for="audio in filteredAudio" :key="audio.id" class="audio-card">
         <div class="audio-info">
           <div class="audio-title">{{ audio.title }}</div>
           <div class="audio-meta">

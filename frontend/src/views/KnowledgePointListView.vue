@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoints, deleteKnowledgePoint } from '../api/knowledgePoint'
 import { getKnowledgeBasesForSelect } from '../api/material'
+import { generateBatchAudio } from '../api/audio'
 import type { KnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgeBase } from '../api/material'
 
@@ -14,6 +15,8 @@ const loading = ref(false)
 const filterKB = ref<number | undefined>()
 const filterImportance = ref('')
 const searchKeyword = ref('')
+const selectedIds = ref<number[]>([])
+const batchLoading = ref(false)
 
 const filteredList = computed(() => {
   let list = knowledgePoints.value
@@ -59,11 +62,37 @@ async function handleDelete(kp: KnowledgePoint) {
     )
     await deleteKnowledgePoint(kp.id)
     ElMessage.success('知识点已删除')
+    selectedIds.value = selectedIds.value.filter((id) => id !== kp.id)
     await fetchData()
   } catch (e: any) {
     if (e !== 'cancel') {
       ElMessage.error(e.response?.data?.detail || '删除失败')
     }
+  }
+}
+
+function handleSelectionChange(selection: KnowledgePoint[]) {
+  selectedIds.value = selection.map((kp) => kp.id)
+}
+
+async function handleBatchGenerate() {
+  if (selectedIds.value.length === 0) {
+    ElMessage.warning('请先选择至少一个知识点')
+    return
+  }
+  if (selectedIds.value.length > 20) {
+    ElMessage.warning('一次最多选择 20 个知识点')
+    return
+  }
+  batchLoading.value = true
+  try {
+    const result = await generateBatchAudio(selectedIds.value)
+    ElMessage.success(`合集音频生成成功（${result.knowledge_point_count} 个知识点）`)
+    selectedIds.value = []
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '批量生成音频失败')
+  } finally {
+    batchLoading.value = false
   }
 }
 
@@ -106,33 +135,71 @@ onMounted(fetchData)
       />
     </div>
 
+    <!-- 批量操作栏 -->
+    <div class="batch-bar" v-if="selectedIds.length > 0">
+      <span class="batch-info">已选择 {{ selectedIds.length }} 个知识点</span>
+      <el-button
+        type="primary"
+        size="small"
+        :loading="batchLoading"
+        :disabled="batchLoading"
+        @click="handleBatchGenerate"
+      >
+        批量生成音频
+      </el-button>
+      <el-button size="small" @click="selectedIds = []">取消选择</el-button>
+    </div>
+
     <!-- 空状态 -->
     <div v-if="!loading && filteredList.length === 0" class="empty">
       暂无知识点，请先在「资料导入」中提取知识点。
     </div>
 
-    <!-- 卡片列表 -->
-    <div v-else class="card-grid">
-      <div v-for="kp in filteredList" :key="kp.id" class="kp-card" @click="goDetail(kp)">
-        <div class="kp-header">
-          <h3>{{ kp.title }}</h3>
-          <span class="importance-badge" :class="importanceTag(kp.importance).class">
-            {{ importanceTag(kp.importance).label }}
-          </span>
-        </div>
-        <p class="kp-summary">{{ kp.summary || '暂无摘要' }}</p>
-        <div class="kp-tags">
-          <span v-for="tag in (kp.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-        </div>
-        <div class="kp-meta">
-          <span>题目 {{ kp.question_count }}</span>
-          <span>音频 {{ kp.audio_count }}</span>
-        </div>
-        <div class="kp-actions" @click.stop>
-          <el-button size="small" @click="goDetail(kp)">详情</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(kp)">删除</el-button>
-        </div>
-      </div>
+    <!-- 表格列表 -->
+    <div v-else>
+      <el-table
+        :data="filteredList"
+        @selection-change="handleSelectionChange"
+        stripe
+        style="width: 100%"
+        row-key="id"
+      >
+        <el-table-column type="selection" width="50" />
+        <el-table-column label="标题" min-width="200">
+          <template #default="{ row }">
+            <span class="kp-title-link" @click="goDetail(row)">{{ row.title }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="摘要" min-width="200">
+          <template #default="{ row }">
+            <span class="kp-summary-cell">{{ row.summary || '暂无摘要' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重要度" width="100">
+          <template #default="{ row }">
+            <span class="importance-badge" :class="importanceTag(row.importance).class">
+              {{ importanceTag(row.importance).label }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="标签" min-width="150">
+          <template #default="{ row }">
+            <span v-for="tag in (row.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="统计" width="120">
+          <template #default="{ row }">
+            <span class="kp-stat">题目 {{ row.question_count }}</span>
+            <span class="kp-stat">音频 {{ row.audio_count }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="goDetail(row)">详情</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
   </div>
 </template>
@@ -161,7 +228,24 @@ onMounted(fetchData)
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+}
+
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: #edf3ff;
+  border-radius: 12px;
+}
+
+.batch-info {
+  font-size: 14px;
+  color: #315de6;
+  font-weight: 600;
+  flex: 1;
 }
 
 .empty {
@@ -171,41 +255,23 @@ onMounted(fetchData)
   font-size: 15px;
 }
 
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 18px;
-}
-
-.kp-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
-  padding: 20px;
+.kp-title-link {
   cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.15s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  color: #315de6;
+  font-weight: 600;
 }
 
-.kp-card:hover {
-  box-shadow: 0 12px 28px rgba(25, 36, 70, 0.1);
-  transform: translateY(-2px);
+.kp-title-link:hover {
+  text-decoration: underline;
 }
 
-.kp-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.kp-header h3 {
-  font-size: 16px;
-  margin: 0;
-  flex: 1;
+.kp-summary-cell {
+  color: #667085;
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .importance-badge {
@@ -214,7 +280,6 @@ onMounted(fetchData)
   border-radius: 99px;
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
 }
 
 .importance-badge.high {
@@ -232,23 +297,6 @@ onMounted(fetchData)
   color: #087a59;
 }
 
-.kp-summary {
-  margin: 0;
-  color: #667085;
-  font-size: 14px;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.kp-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
 .tag {
   display: inline-block;
   padding: 2px 8px;
@@ -256,18 +304,14 @@ onMounted(fetchData)
   font-size: 12px;
   background: #edf3ff;
   color: #315de6;
+  margin-right: 4px;
+  margin-bottom: 2px;
 }
 
-.kp-meta {
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
+.kp-stat {
+  display: block;
+  font-size: 12px;
   color: #667085;
-}
-
-.kp-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
+  line-height: 1.6;
 }
 </style>

@@ -8,8 +8,8 @@ from ...core.config import (
 )
 from ...models.knowledge_point import KnowledgePoint
 from ...models.audio_file import AudioFile
-from ...services.tts_service import build_text_from_knowledge_point, synthesize_audio
-from ...services.audio_service import generate_audio_filename, save_audio_file, build_file_url
+from ...services.tts_service import build_text_from_knowledge_point, build_text_from_knowledge_points, synthesize_audio
+from ...services.audio_service import generate_audio_filename, generate_collection_filename, save_audio_file, build_file_url
 
 router = APIRouter(prefix="/api/tts", tags=["tts"])
 
@@ -93,3 +93,85 @@ async def generate_audio(body: dict, db: Session = Depends(get_db)):
         audio_record.error_message = error_detail
         db.commit()
         raise HTTPException(status_code=500, detail=f"TTS 生成失败：{error_detail}")
+
+
+TTS_BATCH_MAX_POINTS = 20
+TTS_BATCH_MAX_CHARS = 5000
+
+
+@router.post("/generate-batch")
+async def generate_batch(body: dict, db: Session = Depends(get_db)):
+    kp_ids = body.get("knowledge_point_ids", [])
+    if not kp_ids or not isinstance(kp_ids, list):
+        raise HTTPException(status_code=400, detail="缺少 knowledge_point_ids（数组）")
+
+    if len(kp_ids) > TTS_BATCH_MAX_POINTS:
+        raise HTTPException(status_code=400, detail=f"一次最多生成 {TTS_BATCH_MAX_POINTS} 个知识点的合集音频")
+
+    # 查询所有知识点
+    kps = db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(kp_ids)).all()
+    if len(kps) != len(kp_ids):
+        found_ids = {kp.id for kp in kps}
+        missing = [i for i in kp_ids if i not in found_ids]
+        raise HTTPException(status_code=404, detail=f"知识点不存在: {missing}")
+
+    # 构建合集播报文本
+    text_content = build_text_from_knowledge_points(kps)
+
+    if len(text_content) > TTS_BATCH_MAX_CHARS:
+        raise HTTPException(status_code=400, detail=f"合集文本过长（{len(text_content)} 字符），超过上限 {TTS_BATCH_MAX_CHARS}，请减少知识点数量")
+
+    # 文件名
+    audio_ext = "wav"
+    filename = generate_collection_filename(kp_ids, ext=audio_ext)
+
+    titles = "、".join(kp.title for kp in kps)
+    if len(titles) > 100:
+        titles = titles[:100] + "..."
+
+    audio_record = AudioFile(
+        knowledge_point_id=kps[0].id,
+        title=f"合集音频（{len(kps)} 个知识点）",
+        text_content=text_content,
+        file_path=str(filename),
+        file_url=build_file_url(filename),
+        status="pending",
+    )
+    db.add(audio_record)
+    db.commit()
+    db.refresh(audio_record)
+
+    provider = TTS_PROVIDER
+    xiaomi_key = XIAOMI_TTS_API_KEY
+    xiaomi_base = XIAOMI_TTS_BASE_URL
+    xiaomi_voice = XIAOMI_TTS_VOICE
+
+    try:
+        audio_bytes = await synthesize_audio(
+            text_content,
+            provider=provider,
+            api_key=xiaomi_key,
+            base_url=xiaomi_base,
+            voice=xiaomi_voice,
+        )
+        file_path = save_audio_file(filename, audio_bytes)
+        audio_record.status = "success"
+        audio_record.file_path = file_path
+        db.commit()
+        db.refresh(audio_record)
+        return {
+            "audio_id": audio_record.id,
+            "title": audio_record.title,
+            "knowledge_point_count": len(kps),
+            "status": "success",
+            "file_url": audio_record.file_url,
+        }
+    except Exception as e:
+        import traceback
+        error_detail = f"{type(e).__name__}: {str(e)}"
+        print(f"TTS BATCH ERROR: {error_detail}", flush=True)
+        print(traceback.format_exc(), flush=True)
+        audio_record.status = "failed"
+        audio_record.error_message = error_detail
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"合集音频生成失败：{error_detail}")
