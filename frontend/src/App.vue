@@ -32,6 +32,7 @@ const menuItems = [
   { key: '/knowledge-points', label: '知识点', icon: '🧠' },
   { key: '/practice', label: '刷题练习', icon: '✅' },
   { key: '/wrong-questions', label: '错题本', icon: '📌' },
+  { key: '/audio', label: '音频播报', icon: '🎧' },
 ]
 </script>
 

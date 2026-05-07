@@ -11,6 +11,7 @@ import KnowledgePointListView from './views/KnowledgePointListView.vue'
 import KnowledgePointDetailView from './views/KnowledgePointDetailView.vue'
 import PracticeView from './views/PracticeView.vue'
 import WrongQuestionView from './views/WrongQuestionView.vue'
+import AudioView from './views/AudioView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -21,6 +22,7 @@ const routes = [
   { path: '/knowledge-points/:id', component: KnowledgePointDetailView },
   { path: '/practice', component: PracticeView },
   { path: '/wrong-questions', component: WrongQuestionView },
+  { path: '/audio', component: AudioView },
 ]
 
 const router = createRouter({
