@@ -3,9 +3,9 @@ from pathlib import Path
 from ..core.paths import AUDIO_DIR
 
 
-def generate_audio_filename(knowledge_point_id: int) -> str:
+def generate_audio_filename(knowledge_point_id: int, ext: str = "wav") -> str:
     ts = time.strftime("%Y%m%d_%H%M%S")
-    return f"kp_{knowledge_point_id}_{ts}.mp3"
+    return f"kp_{knowledge_point_id}_{ts}.{ext}"
 
 
 def save_audio_file(filename: str, content: bytes) -> str:

@@ -99,7 +99,8 @@ async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str)
         "audio": {
             "format": "wav",
             "voice": voice
-        }
+        },
+        "stream": False
     }
 
     async with httpx.AsyncClient(timeout=120) as client:
