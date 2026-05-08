@@ -7,7 +7,12 @@ from ...models.material import Material
 from ...models.knowledge_point import KnowledgePoint
 from ...models.question import Question
 from ...services.ai_service import AIService
-from ...services.dedup_service import normalize_title, normalize_stem
+from ...services.dedup_service import (
+    build_existing_kp_title_set,
+    build_existing_question_stem_set,
+    normalize_stem,
+    normalize_title,
+)
 from ...services.text_splitter import split_text
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -68,6 +73,7 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
     segment_count = len(segments)
     all_created = []
     skipped_count = 0
+    existing_titles = build_existing_kp_title_set(db, material.id)
 
     for seg_idx, segment in enumerate(segments):
         try:
@@ -87,13 +93,8 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
             if not kp.get("title"):
                 skipped_count += 1
                 continue
-            # 去重：标准化 title 比较
             kp_normalized = normalize_title(kp["title"])
-            existing_kps = db.query(KnowledgePoint).filter(
-                KnowledgePoint.material_id == material.id,
-            ).all()
-            is_dup = any(normalize_title(ep.title) == kp_normalized for ep in existing_kps)
-            if is_dup:
+            if not kp_normalized or kp_normalized in existing_titles:
                 skipped_count += 1
                 continue
             point = KnowledgePoint(
@@ -111,6 +112,7 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
             )
             db.add(point)
             all_created.append(point)
+            existing_titles.add(kp_normalized)
 
     material.extracted_count = len(all_created)
     db.commit()
@@ -173,6 +175,9 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
 
     created = []
     skipped = 0
+    duplicate_skipped = 0
+    invalid_skipped = 0
+    existing_stems = build_existing_question_stem_set(db, kp_id)
     for q in raw_questions:
         qt = q.get("question_type")
         stem = q.get("stem", "").strip()
@@ -181,16 +186,13 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
 
         if not stem or not answer:
             skipped += 1
+            invalid_skipped += 1
             continue
 
-        # 去重：同知识点下相同 stem 不重复插入
         stem_normalized = normalize_stem(stem)
-        existing_questions = db.query(Question).filter(
-            Question.knowledge_point_id == kp_id,
-        ).all()
-        is_dup = any(normalize_stem(eq.stem) == stem_normalized for eq in existing_questions)
-        if is_dup:
+        if not stem_normalized or stem_normalized in existing_stems:
             skipped += 1
+            duplicate_skipped += 1
             continue
 
         # 校验单选题
@@ -198,9 +200,11 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
             keys = {o.get("key") for o in options}
             if keys != {"A", "B", "C", "D"}:
                 skipped += 1
+                invalid_skipped += 1
                 continue
             if answer not in ("A", "B", "C", "D"):
                 skipped += 1
+                invalid_skipped += 1
                 continue
 
         # 校验判断题
@@ -208,12 +212,15 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
             keys = {o.get("key") for o in options}
             if keys != {"true", "false"}:
                 skipped += 1
+                invalid_skipped += 1
                 continue
             if answer not in ("true", "false"):
                 skipped += 1
+                invalid_skipped += 1
                 continue
         else:
             skipped += 1
+            invalid_skipped += 1
             continue
 
         difficulty = q.get("difficulty", "medium")
@@ -232,8 +239,11 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
         )
         db.add(question)
         created.append(question)
+        existing_stems.add(stem_normalized)
 
     if not created:
+        if duplicate_skipped > 0 and invalid_skipped == 0:
+            raise HTTPException(status_code=409, detail="生成的题目与现有题目重复，本次未新增题目")
         raise HTTPException(status_code=500, detail="AI 返回的题目格式不符合要求，请重试")
 
     db.commit()

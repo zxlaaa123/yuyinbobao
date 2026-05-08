@@ -1,14 +1,17 @@
 import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
+from ...core.config import AI_MAX_SEGMENTS, AI_SEGMENT_SIZE, get_setting
 from ...core.database import get_db
-from ...core.config import get_setting, AI_SEGMENT_SIZE, AI_MAX_SEGMENTS
-from ...models.material import Material
 from ...models.knowledge_base import KnowledgeBase
 from ...models.knowledge_point import KnowledgePoint
+from ...models.material import Material
 from ...schemas.material import MaterialCreate, MaterialUpdate
-from .ai import _get_ai_service, _dump_json, _load_json
+from ...services.dedup_service import build_existing_kp_title_set, normalize_title
 from ...services.text_splitter import split_text
+from .ai import _get_ai_service, _dump_json, _load_json
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
@@ -20,9 +23,9 @@ def list_materials(knowledge_base_id: int | None = None, db: Session = Depends(g
         query = query.filter(Material.knowledge_base_id == knowledge_base_id)
     materials = query.order_by(Material.id.desc()).all()
     result = []
-    for m in materials:
-        kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == m.knowledge_base_id).first()
-        result.append(_to_response(m, kb.name if kb else ""))
+    for material in materials:
+        kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == material.knowledge_base_id).first()
+        result.append(_to_response(material, kb.name if kb else ""))
     return result
 
 
@@ -37,6 +40,7 @@ def create_material(body: MaterialCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="资料标题不能为空")
     if not body.content or not body.content.strip():
         raise HTTPException(status_code=400, detail="资料正文不能为空")
+
     material = Material(
         knowledge_base_id=body.knowledge_base_id,
         title=body.title.strip(),
@@ -88,9 +92,6 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
     enable_split = body.get("enable_split", False)
     print(f"[EXTRACT] enable_split={enable_split}, content_length={len(material.content)}", flush=True)
 
-    # 获取分段参数
-    from ...core.config import AI_SEGMENT_SIZE, AI_MAX_SEGMENTS
-    from ...services.text_splitter import split_text
     segment_size_raw = get_setting(db, "AI_SEGMENT_SIZE", str(AI_SEGMENT_SIZE))
     max_segments_raw = get_setting(db, "AI_MAX_SEGMENTS", str(AI_MAX_SEGMENTS))
     print(f"[EXTRACT] segment_size_raw={segment_size_raw}, max_segments_raw={max_segments_raw}", flush=True)
@@ -110,6 +111,7 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
     ai_service = _get_ai_service(db)
     all_created = []
     skipped_count = 0
+    existing_titles = build_existing_kp_title_set(db, material.id)
 
     for seg_idx, segment in enumerate(segments):
         print(f"[EXTRACT] processing segment {seg_idx + 1}/{segment_count}, length={len(segment)}", flush=True)
@@ -121,23 +123,24 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
             )
         except HTTPException:
             raise
-        except Exception as e:
-            print(f"[EXTRACT] segment {seg_idx + 1} failed: {e}", flush=True)
-            raise HTTPException(status_code=500, detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(e)}")
+        except Exception as exc:
+            print(f"[EXTRACT] segment {seg_idx + 1} failed: {exc}", flush=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(exc)}",
+            )
 
         knowledge_points = result.get("knowledge_points", [])
         for kp in knowledge_points:
             if not kp.get("title"):
                 skipped_count += 1
                 continue
-            # 去重：同 material 下相同 title 不重复插入
-            existing = db.query(KnowledgePoint).filter(
-                KnowledgePoint.material_id == material.id,
-                KnowledgePoint.title == kp["title"],
-            ).first()
-            if existing:
+
+            normalized_title = normalize_title(kp["title"])
+            if not normalized_title or normalized_title in existing_titles:
                 skipped_count += 1
                 continue
+
             point = KnowledgePoint(
                 knowledge_base_id=material.knowledge_base_id,
                 material_id=material.id,
@@ -148,11 +151,14 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
                 confusing_points=_dump_json(kp.get("confusing_points")),
                 memory_tips=_dump_json(kp.get("memory_tips")),
                 examples=_dump_json(kp.get("examples")),
-                importance=kp.get("importance", "medium") if kp.get("importance") in ("low", "medium", "high") else "medium",
+                importance=kp.get("importance", "medium")
+                if kp.get("importance") in ("low", "medium", "high")
+                else "medium",
                 tags=_dump_json(kp.get("tags")),
             )
             db.add(point)
             all_created.append(point)
+            existing_titles.add(normalized_title)
 
     material.extracted_count = len(all_created)
     db.commit()
@@ -164,8 +170,8 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
         "created_count": len(all_created),
         "skipped_count": skipped_count,
         "knowledge_points": [
-            {"id": p.id, "title": p.title, "importance": p.importance, "tags": _load_json(p.tags)}
-            for p in all_created
+            {"id": point.id, "title": point.title, "importance": point.importance, "tags": _load_json(point.tags)}
+            for point in all_created
         ],
     }
 
@@ -218,25 +224,24 @@ def delete_material(material_id: int, db: Session = Depends(get_db)):
     return {"success": True, "message": "资料已删除"}
 
 
-def _to_response(m: Material, kb_name: str) -> dict:
+def _to_response(material: Material, kb_name: str) -> dict:
     return {
-        "id": m.id,
-        "knowledge_base_id": m.knowledge_base_id,
+        "id": material.id,
+        "knowledge_base_id": material.knowledge_base_id,
         "knowledge_base_name": kb_name,
-        "title": m.title,
-        "content": m.content,
-        "source": m.source,
-        "note": m.note,
-        "material_type": m.material_type,
-        "content_length": m.content_length,
-        "extracted_count": m.extracted_count,
-        "created_at": m.created_at,
-        "updated_at": m.updated_at,
+        "title": material.title,
+        "content": material.content,
+        "source": material.source,
+        "note": material.note,
+        "material_type": material.material_type,
+        "content_length": material.content_length,
+        "extracted_count": material.extracted_count,
+        "created_at": material.created_at,
+        "updated_at": material.updated_at,
     }
 
 
 def _dump_json(value) -> str | None:
-    import json
     if value is None:
         return None
     if isinstance(value, str):
@@ -245,7 +250,6 @@ def _dump_json(value) -> str | None:
 
 
 def _load_json(value: str | None) -> list:
-    import json
     if not value:
         return []
     try:
