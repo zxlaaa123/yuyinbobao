@@ -10,6 +10,7 @@ from ...models.answer_record import AnswerRecord
 from ...models.wrong_question import WrongQuestion
 from ...models.audio_file import AudioFile
 from ...schemas.knowledge_point import KnowledgePointUpdate
+from ...services.audio_service import delete_audio_file
 
 router = APIRouter(prefix="/api/knowledge-points", tags=["knowledge-points"])
 
@@ -165,7 +166,11 @@ def delete_knowledge_point(kp_id: int, db: Session = Depends(get_db)):
         db.query(WrongQuestion).filter(WrongQuestion.question_id == q.id).delete()
         db.delete(q)
     # 删除关联音频
-    db.query(AudioFile).filter(AudioFile.knowledge_point_id == kp.id).delete()
+    audio_files = db.query(AudioFile).filter(AudioFile.knowledge_point_id == kp.id).all()
+    for audio in audio_files:
+        if audio.file_path:
+            delete_audio_file(audio.file_path)
+        db.delete(audio)
     db.delete(kp)
     db.commit()
     return {"success": True, "message": "知识点已删除"}

@@ -6,6 +6,11 @@ from .core.database import engine, Base
 from . import models
 from .api import api_router
 
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+VECTOR_STORE_DIR.mkdir(parents=True, exist_ok=True)
+
 app = FastAPI()
 
 app.add_middleware(
@@ -27,10 +32,6 @@ app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
 
 @app.on_event("startup")
 def startup():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    VECTOR_STORE_DIR.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
 
 

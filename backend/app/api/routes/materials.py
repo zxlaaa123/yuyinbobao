@@ -75,22 +75,8 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
     if not content:
         raise HTTPException(status_code=400, detail="资料正文不能为空")
 
-    material = Material(
-        knowledge_base_id=knowledge_base_id,
-        title=title,
-        content=content,
-        source=source,
-        note=note,
-        material_type="text",
-        content_length=len(content),
-        extracted_count=0,
-    )
-    db.add(material)
-    db.commit()
-    db.refresh(material)
-
     enable_split = body.get("enable_split", False)
-    print(f"[EXTRACT] enable_split={enable_split}, content_length={len(material.content)}", flush=True)
+    print(f"[EXTRACT] enable_split={enable_split}, content_length={len(content)}", flush=True)
 
     segment_size_raw = get_setting(db, "AI_SEGMENT_SIZE", str(AI_SEGMENT_SIZE))
     max_segments_raw = get_setting(db, "AI_MAX_SEGMENTS", str(AI_MAX_SEGMENTS))
@@ -100,9 +86,9 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
     print(f"[EXTRACT] segment_size={segment_size}, max_segments={max_segments}", flush=True)
 
     if enable_split:
-        segments = split_text(material.content, segment_size=segment_size, max_segments=max_segments)
+        segments = split_text(content, segment_size=segment_size, max_segments=max_segments)
     else:
-        segments = [material.content]
+        segments = [content]
 
     split_used = len(segments) > 1
     segment_count = len(segments)
@@ -111,57 +97,78 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
     ai_service = _get_ai_service(db)
     all_created = []
     skipped_count = 0
-    existing_titles = build_existing_kp_title_set(db, material.id)
 
-    for seg_idx, segment in enumerate(segments):
-        print(f"[EXTRACT] processing segment {seg_idx + 1}/{segment_count}, length={len(segment)}", flush=True)
-        try:
-            result = await ai_service.extract_knowledge_points(
-                knowledge_base_name=kb.name,
-                material_title=material.title,
-                material_content=segment,
-            )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            print(f"[EXTRACT] segment {seg_idx + 1} failed: {exc}", flush=True)
-            raise HTTPException(
-                status_code=500,
-                detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(exc)}",
-            )
+    try:
+        material = Material(
+            knowledge_base_id=knowledge_base_id,
+            title=title,
+            content=content,
+            source=source,
+            note=note,
+            material_type="text",
+            content_length=len(content),
+            extracted_count=0,
+        )
+        db.add(material)
+        db.flush()
 
-        knowledge_points = result.get("knowledge_points", [])
-        for kp in knowledge_points:
-            if not kp.get("title"):
-                skipped_count += 1
-                continue
+        existing_titles = build_existing_kp_title_set(db, material.id)
 
-            normalized_title = normalize_title(kp["title"])
-            if not normalized_title or normalized_title in existing_titles:
-                skipped_count += 1
-                continue
+        for seg_idx, segment in enumerate(segments):
+            print(f"[EXTRACT] processing segment {seg_idx + 1}/{segment_count}, length={len(segment)}", flush=True)
+            try:
+                result = await ai_service.extract_knowledge_points(
+                    knowledge_base_name=kb.name,
+                    material_title=material.title,
+                    material_content=segment,
+                )
+            except HTTPException:
+                raise
+            except Exception as exc:
+                print(f"[EXTRACT] segment {seg_idx + 1} failed: {exc}", flush=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(exc)}",
+                )
 
-            point = KnowledgePoint(
-                knowledge_base_id=material.knowledge_base_id,
-                material_id=material.id,
-                title=kp["title"],
-                summary=kp.get("summary", ""),
-                detail=kp.get("detail", ""),
-                exam_points=_dump_json(kp.get("exam_points")),
-                confusing_points=_dump_json(kp.get("confusing_points")),
-                memory_tips=_dump_json(kp.get("memory_tips")),
-                examples=_dump_json(kp.get("examples")),
-                importance=kp.get("importance", "medium")
-                if kp.get("importance") in ("low", "medium", "high")
-                else "medium",
-                tags=_dump_json(kp.get("tags")),
-            )
-            db.add(point)
-            all_created.append(point)
-            existing_titles.add(normalized_title)
+            knowledge_points = result.get("knowledge_points", [])
+            for kp in knowledge_points:
+                if not kp.get("title"):
+                    skipped_count += 1
+                    continue
 
-    material.extracted_count = len(all_created)
-    db.commit()
+                normalized_title = normalize_title(kp["title"])
+                if not normalized_title or normalized_title in existing_titles:
+                    skipped_count += 1
+                    continue
+
+                point = KnowledgePoint(
+                    knowledge_base_id=material.knowledge_base_id,
+                    material_id=material.id,
+                    title=kp["title"],
+                    summary=kp.get("summary", ""),
+                    detail=kp.get("detail", ""),
+                    exam_points=_dump_json(kp.get("exam_points")),
+                    confusing_points=_dump_json(kp.get("confusing_points")),
+                    memory_tips=_dump_json(kp.get("memory_tips")),
+                    examples=_dump_json(kp.get("examples")),
+                    importance=kp.get("importance", "medium")
+                    if kp.get("importance") in ("low", "medium", "high")
+                    else "medium",
+                    tags=_dump_json(kp.get("tags")),
+                )
+                db.add(point)
+                all_created.append(point)
+                existing_titles.add(normalized_title)
+
+        material.extracted_count = len(all_created)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "material_id": material.id,
