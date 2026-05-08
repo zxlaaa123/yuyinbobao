@@ -1,10 +1,12 @@
 import httpx
-from .json_parser import extract_json_from_text
+from .json_parser import extract_json_from_text, try_fix_json
 from .prompt_templates import (
     EXTRACT_KNOWLEDGE_POINTS_SYSTEM,
     GENERATE_QUESTIONS_SYSTEM,
+    JSON_FIX_SYSTEM,
     build_extract_user_prompt,
     build_generate_questions_user_prompt,
+    build_json_fix_prompt,
 )
 
 
@@ -43,7 +45,24 @@ class AIService:
     async def extract_knowledge_points(self, knowledge_base_name: str, material_title: str, material_content: str) -> dict:
         user_prompt = build_extract_user_prompt(knowledge_base_name, material_title, material_content)
         raw = await self.chat(EXTRACT_KNOWLEDGE_POINTS_SYSTEM, user_prompt)
-        result = extract_json_from_text(raw)
+        try:
+            result = extract_json_from_text(raw)
+        except ValueError:
+            # JSON 解析失败，尝试修复一次
+            fixed = try_fix_json(raw)
+            if fixed:
+                try:
+                    result = extract_json_from_text(fixed)
+                except ValueError:
+                    raise ValueError("AI 返回结果不是有效 JSON，修复失败，请重试")
+            else:
+                # 用 AI 修复
+                try:
+                    fix_prompt = build_json_fix_prompt(raw[:3000])  # 限制长度
+                    fixed_raw = await self.chat(JSON_FIX_SYSTEM, fix_prompt)
+                    result = extract_json_from_text(fixed_raw)
+                except Exception:
+                    raise ValueError("AI 返回结果不是有效 JSON，修复失败，请重试")
         if "knowledge_points" not in result:
             raise ValueError("AI 返回结果缺少 knowledge_points 字段")
         return result
@@ -72,7 +91,24 @@ class AIService:
             count=count,
         )
         raw = await self.chat(GENERATE_QUESTIONS_SYSTEM, user_prompt)
-        result = extract_json_from_text(raw)
+        try:
+            result = extract_json_from_text(raw)
+        except ValueError:
+            # JSON 解析失败，尝试修复一次
+            fixed = try_fix_json(raw)
+            if fixed:
+                try:
+                    result = extract_json_from_text(fixed)
+                except ValueError:
+                    raise ValueError("AI 返回结果不是有效 JSON，修复失败，请重试")
+            else:
+                # 用 AI 修复
+                try:
+                    fix_prompt = build_json_fix_prompt(raw[:3000])
+                    fixed_raw = await self.chat(JSON_FIX_SYSTEM, fix_prompt)
+                    result = extract_json_from_text(fixed_raw)
+                except Exception:
+                    raise ValueError("AI 返回结果不是有效 JSON，修复失败，请重试")
         if "questions" not in result:
             raise ValueError("AI 返回结果缺少 questions 字段")
         return result

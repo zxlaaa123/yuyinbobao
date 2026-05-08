@@ -59,6 +59,28 @@ def build_extract_user_prompt(knowledge_base_name: str, material_title: str, mat
 }}"""
 
 
+JSON_FIX_SYSTEM = """你是一个 JSON 格式修复助手。
+
+你的任务：
+1. 用户会给你一段格式不正确的 JSON 文本。
+2. 你需要修复它，使其成为有效的 JSON。
+3. 只修复语法错误，不要改变数据内容。
+4. 必须只返回修复后的 JSON，不要返回任何解释或额外文本。
+5. 如果无法修复，返回 {"error": "无法修复"}。"""
+
+
+def build_json_fix_prompt(broken_json: str) -> str:
+    return f"""请修复以下 JSON 文本，使其成为有效的 JSON：
+
+{broken_json}
+
+要求：
+1. 只修复语法错误（如缺少引号、括号不匹配、逗号错误等）
+2. 不要改变数据内容
+3. 只返回修复后的 JSON，不要返回任何解释
+4. 如果无法修复，返回 {{"error": "无法修复"}}"""
+
+
 GENERATE_QUESTIONS_SYSTEM = """你是一个考试题目生成助手，擅长根据知识点生成适合复习的练习题。
 
 你的任务：

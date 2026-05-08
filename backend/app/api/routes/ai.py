@@ -7,6 +7,7 @@ from ...models.material import Material
 from ...models.knowledge_point import KnowledgePoint
 from ...models.question import Question
 from ...services.ai_service import AIService
+from ...services.dedup_service import normalize_title, normalize_stem
 from ...services.text_splitter import split_text
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -86,12 +87,13 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
             if not kp.get("title"):
                 skipped_count += 1
                 continue
-            # 去重：同 material 下相同 title 不重复插入
-            existing = db.query(KnowledgePoint).filter(
+            # 去重：标准化 title 比较
+            kp_normalized = normalize_title(kp["title"])
+            existing_kps = db.query(KnowledgePoint).filter(
                 KnowledgePoint.material_id == material.id,
-                KnowledgePoint.title == kp["title"],
-            ).first()
-            if existing:
+            ).all()
+            is_dup = any(normalize_title(ep.title) == kp_normalized for ep in existing_kps)
+            if is_dup:
                 skipped_count += 1
                 continue
             point = KnowledgePoint(
@@ -178,6 +180,16 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
         options = q.get("options", [])
 
         if not stem or not answer:
+            skipped += 1
+            continue
+
+        # 去重：同知识点下相同 stem 不重复插入
+        stem_normalized = normalize_stem(stem)
+        existing_questions = db.query(Question).filter(
+            Question.knowledge_point_id == kp_id,
+        ).all()
+        is_dup = any(normalize_stem(eq.stem) == stem_normalized for eq in existing_questions)
+        if is_dup:
             skipped += 1
             continue
 
