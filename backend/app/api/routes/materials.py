@@ -1,11 +1,14 @@
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
+from ...core.config import get_setting, AI_SEGMENT_SIZE, AI_MAX_SEGMENTS
 from ...models.material import Material
 from ...models.knowledge_base import KnowledgeBase
 from ...models.knowledge_point import KnowledgePoint
 from ...schemas.material import MaterialCreate, MaterialUpdate
-from .ai import _get_ai_service
+from .ai import _get_ai_service, _dump_json, _load_json
+from ...services.text_splitter import split_text
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
@@ -82,48 +85,87 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(material)
 
+    enable_split = body.get("enable_split", False)
+    print(f"[EXTRACT] enable_split={enable_split}, content_length={len(material.content)}", flush=True)
+
+    # 获取分段参数
+    from ...core.config import AI_SEGMENT_SIZE, AI_MAX_SEGMENTS
+    from ...services.text_splitter import split_text
+    segment_size_raw = get_setting(db, "AI_SEGMENT_SIZE", str(AI_SEGMENT_SIZE))
+    max_segments_raw = get_setting(db, "AI_MAX_SEGMENTS", str(AI_MAX_SEGMENTS))
+    print(f"[EXTRACT] segment_size_raw={segment_size_raw}, max_segments_raw={max_segments_raw}", flush=True)
+    segment_size = int(segment_size_raw or str(AI_SEGMENT_SIZE))
+    max_segments = int(max_segments_raw or str(AI_MAX_SEGMENTS))
+    print(f"[EXTRACT] segment_size={segment_size}, max_segments={max_segments}", flush=True)
+
+    if enable_split:
+        segments = split_text(material.content, segment_size=segment_size, max_segments=max_segments)
+    else:
+        segments = [material.content]
+
+    split_used = len(segments) > 1
+    segment_count = len(segments)
+    print(f"[EXTRACT] segments={segment_count}, split_used={split_used}", flush=True)
+
     ai_service = _get_ai_service(db)
-    try:
-        result = await ai_service.extract_knowledge_points(
-            knowledge_base_name=kb.name,
-            material_title=material.title,
-            material_content=material.content,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI 调用失败：{str(e)}")
+    all_created = []
+    skipped_count = 0
 
-    knowledge_points = result.get("knowledge_points", [])
-    created = []
-    for kp in knowledge_points:
-        if not kp.get("title"):
-            continue
-        point = KnowledgePoint(
-            knowledge_base_id=material.knowledge_base_id,
-            material_id=material.id,
-            title=kp["title"],
-            summary=kp.get("summary", ""),
-            detail=kp.get("detail", ""),
-            exam_points=_dump_json(kp.get("exam_points")),
-            confusing_points=_dump_json(kp.get("confusing_points")),
-            memory_tips=_dump_json(kp.get("memory_tips")),
-            examples=_dump_json(kp.get("examples")),
-            importance=kp.get("importance", "medium") if kp.get("importance") in ("low", "medium", "high") else "medium",
-            tags=_dump_json(kp.get("tags")),
-        )
-        db.add(point)
-        created.append(point)
+    for seg_idx, segment in enumerate(segments):
+        print(f"[EXTRACT] processing segment {seg_idx + 1}/{segment_count}, length={len(segment)}", flush=True)
+        try:
+            result = await ai_service.extract_knowledge_points(
+                knowledge_base_name=kb.name,
+                material_title=material.title,
+                material_content=segment,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"[EXTRACT] segment {seg_idx + 1} failed: {e}", flush=True)
+            raise HTTPException(status_code=500, detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(e)}")
 
-    material.extracted_count = len(created)
+        knowledge_points = result.get("knowledge_points", [])
+        for kp in knowledge_points:
+            if not kp.get("title"):
+                skipped_count += 1
+                continue
+            # 去重：同 material 下相同 title 不重复插入
+            existing = db.query(KnowledgePoint).filter(
+                KnowledgePoint.material_id == material.id,
+                KnowledgePoint.title == kp["title"],
+            ).first()
+            if existing:
+                skipped_count += 1
+                continue
+            point = KnowledgePoint(
+                knowledge_base_id=material.knowledge_base_id,
+                material_id=material.id,
+                title=kp["title"],
+                summary=kp.get("summary", ""),
+                detail=kp.get("detail", ""),
+                exam_points=_dump_json(kp.get("exam_points")),
+                confusing_points=_dump_json(kp.get("confusing_points")),
+                memory_tips=_dump_json(kp.get("memory_tips")),
+                examples=_dump_json(kp.get("examples")),
+                importance=kp.get("importance", "medium") if kp.get("importance") in ("low", "medium", "high") else "medium",
+                tags=_dump_json(kp.get("tags")),
+            )
+            db.add(point)
+            all_created.append(point)
+
+    material.extracted_count = len(all_created)
     db.commit()
 
     return {
-        "material": {"id": material.id, "title": material.title},
-        "created_count": len(created),
+        "material_id": material.id,
+        "split_used": split_used,
+        "segment_count": segment_count,
+        "created_count": len(all_created),
+        "skipped_count": skipped_count,
         "knowledge_points": [
             {"id": p.id, "title": p.title, "importance": p.importance, "tags": _load_json(p.tags)}
-            for p in created
+            for p in all_created
         ],
     }
 

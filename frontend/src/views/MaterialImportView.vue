@@ -164,7 +164,8 @@ onMounted(fetchKnowledgeBases)
 
         <div v-if="extracting" class="loading-box">
           <div class="spinner"></div>
-          <p>正在调用 AI 提取知识点，请稍候...</p>
+          <p v-if="form.enable_split">正在分段提取知识点，可能需要几分钟，请耐心等待...</p>
+          <p v-else>正在调用 AI 提取知识点，请稍候...</p>
         </div>
 
         <div v-else-if="extractResult" class="result-content">
