@@ -23,7 +23,7 @@ class KnowledgePoint(Base):
     correct_streak = Column(Integer, default=0, nullable=False)
     wrong_streak = Column(Integer, default=0, nullable=False)
     last_reviewed_at = Column(DateTime, nullable=True)
-    next_review_at = Column(DateTime, nullable=True, index=True)
+    next_review_at = Column(DateTime, default=datetime.utcnow, nullable=True, index=True)
     review_status = Column(String(20), default="new", nullable=False, index=True)
     ai_raw_response = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

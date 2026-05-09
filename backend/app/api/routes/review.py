@@ -4,6 +4,7 @@ from datetime import datetime
 from ...core.database import get_db
 from ...models.knowledge_point import KnowledgePoint
 from ...services.review_service import (
+    get_today_review_overview,
     get_tasks,
     get_task_by_id,
     delete_task,
@@ -13,6 +14,15 @@ from ...services.review_service import (
 )
 
 router = APIRouter(prefix="/api/review", tags=["review"])
+
+
+@router.get("/today")
+def today_review(
+    knowledge_base_id: int | None = Query(None, description="按知识库筛选"),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    return get_today_review_overview(db, knowledge_base_id=knowledge_base_id, limit=limit)
 
 
 @router.get("/tasks")

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from ..models.review_task import ReviewTask
 from ..models.knowledge_point import KnowledgePoint
 from ..models.wrong_question import WrongQuestion
@@ -8,6 +8,66 @@ from ..models.question import Question
 
 
 REVIEW_BUCKETS = {"today", "overdue", "later", "completed"}
+
+
+def get_today_review_overview(db: Session, knowledge_base_id: int | None = None, limit: int = 100) -> dict:
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow_start = today_start + timedelta(days=1)
+
+    base_query = db.query(KnowledgePoint)
+    if knowledge_base_id:
+        base_query = base_query.filter(KnowledgePoint.knowledge_base_id == knowledge_base_id)
+
+    due_query = base_query.filter(
+        KnowledgePoint.next_review_at.isnot(None),
+        KnowledgePoint.next_review_at < tomorrow_start,
+        KnowledgePoint.review_status.in_(["new", "learning", "review"]),
+    )
+    overdue_query = due_query.filter(KnowledgePoint.next_review_at < today_start)
+    weak_query = base_query.filter(
+        KnowledgePoint.review_status != "mastered",
+        or_(
+            KnowledgePoint.review_status == "learning",
+            KnowledgePoint.wrong_streak > 0,
+        ),
+    )
+
+    due_count = due_query.count()
+    overdue_count = overdue_query.count()
+    weak_count = weak_query.count()
+
+    items = (
+        due_query.order_by(
+            KnowledgePoint.next_review_at.asc().nullslast(),
+            KnowledgePoint.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "due_count": due_count,
+        "overdue_count": overdue_count,
+        "weak_count": weak_count,
+        "items": [
+            {
+                "knowledge_point_id": kp.id,
+                "knowledge_base_id": kp.knowledge_base_id,
+                "title": kp.title,
+                "summary": kp.summary or "",
+                "review_status": kp.review_status,
+                "mastery_level": kp.mastery_level,
+                "review_count": kp.review_count,
+                "correct_streak": kp.correct_streak,
+                "wrong_streak": kp.wrong_streak,
+                "last_reviewed_at": kp.last_reviewed_at.isoformat() if kp.last_reviewed_at else None,
+                "next_review_at": kp.next_review_at.isoformat() if kp.next_review_at else None,
+                "is_overdue": bool(kp.next_review_at and kp.next_review_at < today_start),
+            }
+            for kp in items
+        ],
+    }
 
 
 def _review_bucket(task: ReviewTask, now: datetime | None = None) -> str:
