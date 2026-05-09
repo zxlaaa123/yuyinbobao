@@ -15,6 +15,8 @@ const knowledgeBases = ref<KnowledgeBase[]>([])
 const questions = ref<PracticeQuestion[]>([])
 const currentIndex = ref(0)
 const selectedAnswer = ref('')
+const selectedAnswers = ref<string[]>([])
+const textAnswer = ref('')
 const answered = ref(false)
 const answerResult = ref<any>(null)
 const phase = ref<Phase>('setup')
@@ -67,6 +69,8 @@ async function startPractice() {
     finishedSession.value = null
     currentIndex.value = 0
     selectedAnswer.value = ''
+    selectedAnswers.value = []
+    textAnswer.value = ''
     answered.value = false
     answerResult.value = null
     correctCount.value = 0
@@ -82,14 +86,77 @@ function getSessionKnowledgePointId(): number | undefined {
   return ids.length === 1 ? ids[0] : undefined
 }
 
+function questionTypeLabel(type: string) {
+  const map: Record<string, string> = {
+    single_choice: '单选题',
+    multiple_choice: '多选题',
+    true_false: '判断题',
+    fill_blank: '填空题',
+    short_answer: '简答题',
+  }
+  return map[type] || type || '单选题'
+}
+
+function isChoiceQuestion(question?: PracticeQuestion | null) {
+  return ['single_choice', 'true_false'].includes(question?.question_type || 'single_choice')
+}
+
+function isMultipleChoiceQuestion(question?: PracticeQuestion | null) {
+  return question?.question_type === 'multiple_choice'
+}
+
+function isTextQuestion(question?: PracticeQuestion | null) {
+  return ['fill_blank', 'short_answer'].includes(question?.question_type || '')
+}
+
+function currentUserAnswer() {
+  if (isMultipleChoiceQuestion(currentQuestion.value)) {
+    return [...selectedAnswers.value].sort().join(',')
+  }
+  if (isTextQuestion(currentQuestion.value)) {
+    return textAnswer.value.trim()
+  }
+  return selectedAnswer.value
+}
+
+function hasAnswer() {
+  return Boolean(currentUserAnswer())
+}
+
+function toggleMultiAnswer(key: string) {
+  if (answered.value) return
+  if (selectedAnswers.value.includes(key)) {
+    selectedAnswers.value = selectedAnswers.value.filter((item) => item !== key)
+  } else {
+    selectedAnswers.value = [...selectedAnswers.value, key]
+  }
+}
+
+function answerParts(answer: string | undefined | null) {
+  return (answer || '').split(',').map((item) => item.trim()).filter(Boolean)
+}
+
+function isCorrectOption(key: string) {
+  return answerParts(answerResult.value?.correct_answer).includes(key)
+}
+
+function isWrongSelectedOption(key: string) {
+  if (!answered.value || answerResult.value?.is_correct) return false
+  if (isMultipleChoiceQuestion(currentQuestion.value)) {
+    return selectedAnswers.value.includes(key) && !isCorrectOption(key)
+  }
+  return selectedAnswer.value === key && !isCorrectOption(key)
+}
+
 async function handleSubmit() {
-  if (!selectedAnswer.value) {
-    ElMessage.warning('请选择答案')
+  const answer = currentUserAnswer()
+  if (!answer) {
+    ElMessage.warning(isTextQuestion(currentQuestion.value) ? '请填写答案' : '请选择答案')
     return
   }
   if (!currentQuestion.value) return
   try {
-    const result = await submitAnswer(currentQuestion.value.id, selectedAnswer.value)
+    const result = await submitAnswer(currentQuestion.value.id, answer)
     answerResult.value = result
     answered.value = true
     if (result.is_correct) {
@@ -125,6 +192,8 @@ async function nextQuestion() {
   }
   currentIndex.value++
   selectedAnswer.value = ''
+  selectedAnswers.value = []
+  textAnswer.value = ''
   answered.value = false
   answerResult.value = null
 }
@@ -134,6 +203,8 @@ function resetPractice() {
   questions.value = []
   currentIndex.value = 0
   selectedAnswer.value = ''
+  selectedAnswers.value = []
+  textAnswer.value = ''
   answered.value = false
   answerResult.value = null
   correctCount.value = 0
@@ -165,7 +236,10 @@ onMounted(fetchKBs)
         <el-form-item label="题型">
           <el-select v-model="selType" placeholder="全部题型" clearable style="width: 100%">
             <el-option label="单选题" value="single_choice" />
+            <el-option label="多选题" value="multiple_choice" />
             <el-option label="判断题" value="true_false" />
+            <el-option label="填空题" value="fill_blank" />
+            <el-option label="简答题" value="short_answer" />
           </el-select>
         </el-form-item>
         <el-form-item label="题目数量">
@@ -187,19 +261,19 @@ onMounted(fetchKBs)
 
       <!-- 题目 -->
       <div class="question-area">
-        <div class="q-type">{{ currentQuestion.question_type === 'single_choice' ? '单选题' : '判断题' }}</div>
+        <div class="q-type">{{ questionTypeLabel(currentQuestion.question_type) }}</div>
         <div class="q-stem">{{ currentQuestion.stem }}</div>
 
-        <!-- 选项 -->
-        <div class="options">
+        <!-- 单选 / 判断 -->
+        <div v-if="isChoiceQuestion(currentQuestion)" class="options">
           <div
             v-for="opt in currentQuestion.options"
             :key="opt.key"
             class="option"
             :class="{
               selected: selectedAnswer === opt.key,
-              correct: answered && opt.key === answerResult?.correct_answer,
-              wrong: answered && selectedAnswer === opt.key && !answerResult?.is_correct,
+              correct: answered && isCorrectOption(opt.key),
+              wrong: isWrongSelectedOption(opt.key),
             }"
             :disabled="answered"
             @click="!answered && (selectedAnswer = opt.key)"
@@ -207,6 +281,36 @@ onMounted(fetchKBs)
             <span class="opt-key">{{ opt.key }}</span>
             <span class="opt-text">{{ opt.text }}</span>
           </div>
+        </div>
+
+        <!-- 多选 -->
+        <div v-else-if="isMultipleChoiceQuestion(currentQuestion)" class="options">
+          <div
+            v-for="opt in currentQuestion.options"
+            :key="opt.key"
+            class="option"
+            :class="{
+              selected: selectedAnswers.includes(opt.key),
+              correct: answered && isCorrectOption(opt.key),
+              wrong: isWrongSelectedOption(opt.key),
+            }"
+            :disabled="answered"
+            @click="toggleMultiAnswer(opt.key)"
+          >
+            <span class="opt-key">{{ opt.key }}</span>
+            <span class="opt-text">{{ opt.text }}</span>
+          </div>
+        </div>
+
+        <!-- 填空 / 简答 -->
+        <div v-else class="text-answer">
+          <el-input
+            v-model="textAnswer"
+            :type="currentQuestion.question_type === 'short_answer' ? 'textarea' : 'text'"
+            :autosize="{ minRows: 4, maxRows: 8 }"
+            :disabled="answered"
+            :placeholder="currentQuestion.question_type === 'short_answer' ? '请输入简答内容' : '请输入填空答案'"
+          />
         </div>
       </div>
 
@@ -217,13 +321,16 @@ onMounted(fetchKBs)
         </div>
         <div class="result-info">
           <p>正确答案：<strong>{{ answerResult.correct_answer }}</strong></p>
+          <p v-if="currentQuestion.question_type === 'short_answer' && answerResult.reference_answer" class="reference">
+            参考答案：{{ answerResult.reference_answer }}
+          </p>
           <p v-if="answerResult.analysis" class="analysis">解析：{{ answerResult.analysis }}</p>
         </div>
       </div>
 
       <!-- 操作 -->
       <div class="actions">
-        <el-button v-if="!answered" type="primary" :disabled="!selectedAnswer" @click="handleSubmit">
+        <el-button v-if="!answered" type="primary" :disabled="!hasAnswer()" @click="handleSubmit">
           提交答案
         </el-button>
         <el-button v-else-if="currentIndex + 1 < totalQuestions" type="primary" @click="nextQuestion">
@@ -356,6 +463,10 @@ onMounted(fetchKBs)
   margin-bottom: 20px;
 }
 
+.text-answer {
+  margin-bottom: 20px;
+}
+
 .option {
   display: flex;
   align-items: center;
@@ -436,6 +547,11 @@ onMounted(fetchKBs)
 
 .result-info .analysis {
   color: var(--muted);
+  line-height: 1.6;
+}
+
+.result-info .reference {
+  color: var(--text);
   line-height: 1.6;
 }
 

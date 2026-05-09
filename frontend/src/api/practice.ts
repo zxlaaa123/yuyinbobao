@@ -26,6 +26,7 @@ export interface AnswerResult {
   is_correct: boolean
   user_answer: string
   correct_answer: string
+  reference_answer: string | null
   analysis: string
   wrong_question_id: number | null
   review?: AnswerReviewState | null

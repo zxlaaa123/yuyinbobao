@@ -10,6 +10,25 @@ from ...services.review_service import apply_answer_review_result
 router = APIRouter(prefix="/api/practice", tags=["practice"])
 
 
+def _normalize_text_answer(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+def _normalize_multi_answer(value: str | None) -> str:
+    parts = [part.strip().upper() for part in (value or "").split(",") if part.strip()]
+    return ",".join(sorted(set(parts)))
+
+
+def _is_answer_correct(question: Question, user_answer: str) -> bool:
+    question_type = question.question_type or "single_choice"
+    correct_answer = question.answer or ""
+    if question_type == "multiple_choice":
+        return _normalize_multi_answer(user_answer) == _normalize_multi_answer(correct_answer)
+    if question_type in {"fill_blank", "short_answer"}:
+        return _normalize_text_answer(user_answer) == _normalize_text_answer(correct_answer)
+    return _normalize_text_answer(user_answer) == _normalize_text_answer(correct_answer)
+
+
 @router.get("/questions")
 def get_practice_questions(
     knowledge_base_id: int | None = None,
@@ -55,7 +74,7 @@ def submit_answer(body: dict, db: Session = Depends(get_db)):
     if not q:
         raise HTTPException(status_code=404, detail="题目不存在")
 
-    is_correct = user_answer.upper() == q.answer.upper()
+    is_correct = _is_answer_correct(q, user_answer)
 
     # 保存答题记录
     record = AnswerRecord(
@@ -93,6 +112,7 @@ def submit_answer(body: dict, db: Session = Depends(get_db)):
         "is_correct": is_correct,
         "user_answer": user_answer,
         "correct_answer": q.answer,
+        "reference_answer": q.reference_answer or q.answer,
         "analysis": q.analysis or "",
         "wrong_question_id": wrong_question_id,
         "review": review,
