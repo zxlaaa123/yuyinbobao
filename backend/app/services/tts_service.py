@@ -1,7 +1,6 @@
 import time
 import httpx
 import base64
-from .audio_service import generate_audio_filename, save_audio_file, build_file_url
 
 
 def build_text_from_knowledge_points(kps: list) -> str:
@@ -114,24 +113,61 @@ def build_text_from_knowledge_point(kp) -> str:
     return "\n\n".join(parts)
 
 
-async def synthesize_audio(text: str, provider: str = "mock", api_key: str = "", base_url: str = "", voice: str = "mimo_default") -> bytes:
+def normalize_audio_format(audio_format: str | None) -> str:
+    normalized = (audio_format or "mp3").strip().lower()
+    if normalized not in {"mp3", "wav", "pcm16"}:
+        return "mp3"
+    return normalized
+
+
+async def synthesize_audio(
+    text: str,
+    provider: str = "mock",
+    api_key: str = "",
+    base_url: str = "",
+    voice: str = "mimo_default",
+    audio_format: str = "mp3",
+) -> bytes:
+    audio_format = normalize_audio_format(audio_format)
     if provider == "mock":
-        return _mock_synthesize(text)
+        return _mock_synthesize(text, audio_format)
     elif provider == "xiaomi":
-        return await _xiaomi_synthesize(text, api_key, base_url, voice)
+        return await _xiaomi_synthesize(text, api_key, base_url, voice, audio_format)
     else:
         raise ValueError(f"不支持的 TTS Provider: {provider}")
 
 
-def _mock_synthesize(text: str) -> bytes:
-    """Mock TTS：生成一个简短的静音 MP3 占位文件"""
+def _mock_synthesize(text: str, audio_format: str) -> bytes:
+    """Mock TTS：生成与配置格式一致的静音占位音频"""
+    if audio_format == "wav":
+        return _mock_wav(text)
+    if audio_format == "pcm16":
+        return b"\x00\x00" * _mock_sample_count(text)
+
     mp3_header = b'\xff\xfb\x90\x00'
     silent_frame = mp3_header + b'\x00' * 417
     num_frames = max(1, len(text) // 50)
     return silent_frame * min(num_frames, 30)
 
 
-async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str) -> bytes:
+def _mock_sample_count(text: str) -> int:
+    return min(max(8000, len(text) * 160), 8000 * 30)
+
+
+def _mock_wav(text: str) -> bytes:
+    import io
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(8000)
+        wav.writeframes(b"\x00\x00" * _mock_sample_count(text))
+    return buffer.getvalue()
+
+
+async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str, audio_format: str) -> bytes:
     """小米 TTS Provider"""
     if not api_key:
         raise ValueError("小米 TTS API Key 未配置")
@@ -156,7 +192,7 @@ async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str)
             }
         ],
         "audio": {
-            "format": "wav",
+            "format": audio_format,
             "voice": voice
         },
         "stream": False

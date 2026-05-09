@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...services.setting_service import get_all_settings, update_settings, mask_secret, SENSITIVE_KEYS
+from ...services.ai_service import build_chat_completions_url
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -52,7 +53,7 @@ async def test_ai_connection(db: Session = Depends(get_db)):
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
-                f"{base_url.rstrip('/')}/v1/chat/completions",
+                build_chat_completions_url(base_url),
                 json=payload,
                 headers=headers,
             )
@@ -77,6 +78,8 @@ async def test_tts_connection(db: Session = Depends(get_db)):
     if provider == "xiaomi":
         api_key = settings.get("XIAOMI_TTS_API_KEY", "")
         base_url = settings.get("XIAOMI_TTS_BASE_URL", "")
+        voice = settings.get("XIAOMI_TTS_VOICE", "mimo_default")
+        audio_format = settings.get("XIAOMI_TTS_FORMAT", "mp3")
         if not api_key:
             return {"success": False, "message": "小米 TTS API Key 未配置，请先到设置页配置"}
         if not base_url:
@@ -93,7 +96,7 @@ async def test_tts_connection(db: Session = Depends(get_db)):
                 {"role": "user", "content": "用清晰自然的语调朗读。"},
                 {"role": "assistant", "content": "测试音频。"}
             ],
-            "audio": {"format": "wav", "voice": "mimo_default"},
+            "audio": {"format": audio_format, "voice": voice},
         }
         try:
             async with httpx.AsyncClient(timeout=30) as client:

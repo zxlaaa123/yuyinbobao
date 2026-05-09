@@ -10,6 +10,13 @@ from .prompt_templates import (
 )
 
 
+def build_chat_completions_url(base_url: str) -> str:
+    normalized = base_url.rstrip("/")
+    if normalized.endswith("/v1"):
+        return f"{normalized}/chat/completions"
+    return f"{normalized}/v1/chat/completions"
+
+
 class AIService:
     def __init__(self, api_key: str, base_url: str, model: str, temperature: float = 0.3, timeout: int = 120):
         self.api_key = api_key
@@ -19,9 +26,7 @@ class AIService:
         self.timeout = timeout
 
     def _build_chat_url(self) -> str:
-        if self.base_url.endswith("/v1"):
-            return f"{self.base_url}/chat/completions"
-        return f"{self.base_url}/v1/chat/completions"
+        return build_chat_completions_url(self.base_url)
 
     async def chat(self, system_prompt: str, user_prompt: str) -> str:
         headers = {

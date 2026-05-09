@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...core.config import (
     TTS_PROVIDER,
-    XIAOMI_TTS_API_KEY, XIAOMI_TTS_BASE_URL, XIAOMI_TTS_VOICE,
+    XIAOMI_TTS_API_KEY, XIAOMI_TTS_BASE_URL, XIAOMI_TTS_VOICE, XIAOMI_TTS_FORMAT,
 )
 from ...services.setting_service import get_all_settings
 from ...models.knowledge_point import KnowledgePoint
@@ -13,7 +13,7 @@ from ...models.audio_file import AudioFile
 from ...models.review_task import ReviewTask
 from ...models.wrong_question import WrongQuestion
 from ...models.question import Question
-from ...services.tts_service import build_text_from_knowledge_point, build_text_from_knowledge_points, synthesize_audio
+from ...services.tts_service import build_text_from_knowledge_point, build_text_from_knowledge_points, synthesize_audio, normalize_audio_format
 from ...services.audio_service import generate_audio_filename, generate_collection_filename, save_audio_file, build_file_url
 
 router = APIRouter(prefix="/api/tts", tags=["tts"])
@@ -37,8 +37,8 @@ async def generate_audio(body: dict, db: Session = Depends(get_db)):
     text_content = build_text_from_knowledge_point(kp)
     print(f"播报文本长度: {len(text_content)}", flush=True)
 
-    # 根据 provider 决定文件格式
-    audio_ext = "wav"
+    settings = get_all_settings(db)
+    audio_ext = normalize_audio_format(settings.get("XIAOMI_TTS_FORMAT", XIAOMI_TTS_FORMAT))
     filename = generate_audio_filename(kp.id, ext=audio_ext)
     print(f"文件名: {filename}", flush=True)
 
@@ -56,12 +56,11 @@ async def generate_audio(body: dict, db: Session = Depends(get_db)):
     print(f"audio_record 创建成功, id={audio_record.id}", flush=True)
 
     # 获取 TTS 配置（优先数据库，回退 .env）
-    settings = get_all_settings(db)
     provider = settings.get("TTS_PROVIDER", TTS_PROVIDER)
     xiaomi_key = settings.get("XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
     xiaomi_base = settings.get("XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
     xiaomi_voice = settings.get("XIAOMI_TTS_VOICE", XIAOMI_TTS_VOICE)
-    print(f"配置: provider={provider}, key={xiaomi_key[:10] if xiaomi_key else 'EMPTY'}..., base={xiaomi_base}", flush=True)
+    print(f"配置: provider={provider}, format={audio_ext}, base_configured={bool(xiaomi_base)}", flush=True)
 
     try:
         print("开始调用 synthesize_audio...", flush=True)
@@ -71,6 +70,7 @@ async def generate_audio(body: dict, db: Session = Depends(get_db)):
             api_key=xiaomi_key,
             base_url=xiaomi_base,
             voice=xiaomi_voice,
+            audio_format=audio_ext,
         )
         print(f"synthesize_audio 成功, 音频大小: {len(audio_bytes)} bytes", flush=True)
 
@@ -127,8 +127,8 @@ async def generate_batch(body: dict, db: Session = Depends(get_db)):
     if len(text_content) > TTS_BATCH_MAX_CHARS:
         raise HTTPException(status_code=400, detail=f"合集文本过长（{len(text_content)} 字符），超过上限 {TTS_BATCH_MAX_CHARS}，请减少知识点数量")
 
-    # 文件名
-    audio_ext = "wav"
+    settings = get_all_settings(db)
+    audio_ext = normalize_audio_format(settings.get("XIAOMI_TTS_FORMAT", XIAOMI_TTS_FORMAT))
     filename = generate_collection_filename(kp_ids, ext=audio_ext)
 
     titles = "、".join(kp.title for kp in kps)
@@ -148,7 +148,6 @@ async def generate_batch(body: dict, db: Session = Depends(get_db)):
     db.refresh(audio_record)
 
     # 获取 TTS 配置（优先数据库，回退 .env）
-    settings = get_all_settings(db)
     provider = settings.get("TTS_PROVIDER", TTS_PROVIDER)
     xiaomi_key = settings.get("XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
     xiaomi_base = settings.get("XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
@@ -161,6 +160,7 @@ async def generate_batch(body: dict, db: Session = Depends(get_db)):
             api_key=xiaomi_key,
             base_url=xiaomi_base,
             voice=xiaomi_voice,
+            audio_format=audio_ext,
         )
         file_path = save_audio_file(filename, audio_bytes)
         audio_record.status = "success"
@@ -193,7 +193,8 @@ async def _generate_collection_audio(db: Session, kps: list[KnowledgePoint], tit
     if len(text_content) > TTS_BATCH_MAX_CHARS:
         raise HTTPException(status_code=400, detail=f"合集文本过长（{len(text_content)} 字符），超过上限 {TTS_BATCH_MAX_CHARS}")
 
-    audio_ext = "wav"
+    settings = get_all_settings(db)
+    audio_ext = normalize_audio_format(settings.get("XIAOMI_TTS_FORMAT", XIAOMI_TTS_FORMAT))
     filename = generate_collection_filename(kp_ids, ext=audio_ext)
 
     audio_record = AudioFile(
@@ -208,7 +209,6 @@ async def _generate_collection_audio(db: Session, kps: list[KnowledgePoint], tit
     db.commit()
     db.refresh(audio_record)
 
-    settings = get_all_settings(db)
     provider = settings.get("TTS_PROVIDER", TTS_PROVIDER)
     xiaomi_key = settings.get("XIAOMI_TTS_API_KEY", XIAOMI_TTS_API_KEY)
     xiaomi_base = settings.get("XIAOMI_TTS_BASE_URL", XIAOMI_TTS_BASE_URL)
@@ -221,6 +221,7 @@ async def _generate_collection_audio(db: Session, kps: list[KnowledgePoint], tit
             api_key=xiaomi_key,
             base_url=xiaomi_base,
             voice=xiaomi_voice,
+            audio_format=audio_ext,
         )
         file_path = save_audio_file(filename, audio_bytes)
         audio_record.status = "success"

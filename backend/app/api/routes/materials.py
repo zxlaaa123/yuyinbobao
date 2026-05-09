@@ -8,7 +8,12 @@ from ...core.database import get_db
 from ...models.knowledge_base import KnowledgeBase
 from ...models.knowledge_point import KnowledgePoint
 from ...models.material import Material
+from ...models.question import Question
+from ...models.answer_record import AnswerRecord
+from ...models.wrong_question import WrongQuestion
+from ...models.audio_file import AudioFile
 from ...schemas.material import MaterialCreate, MaterialUpdate
+from ...services.audio_service import delete_audio_file
 from ...services.dedup_service import build_existing_kp_title_set, normalize_title
 from ...services.text_splitter import split_text
 from .ai import _get_ai_service, _dump_json, _load_json
@@ -226,6 +231,21 @@ def delete_material(material_id: int, db: Session = Depends(get_db)):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="资料不存在")
+    knowledge_points = db.query(KnowledgePoint).filter(KnowledgePoint.material_id == material.id).all()
+    for kp in knowledge_points:
+        questions = db.query(Question).filter(Question.knowledge_point_id == kp.id).all()
+        for q in questions:
+            db.query(AnswerRecord).filter(AnswerRecord.question_id == q.id).delete()
+            db.query(WrongQuestion).filter(WrongQuestion.question_id == q.id).delete()
+            db.delete(q)
+
+        audio_files = db.query(AudioFile).filter(AudioFile.knowledge_point_id == kp.id).all()
+        for audio in audio_files:
+            if audio.file_path:
+                delete_audio_file(audio.file_path)
+            db.delete(audio)
+
+        db.delete(kp)
     db.delete(material)
     db.commit()
     return {"success": True, "message": "资料已删除"}
