@@ -144,7 +144,7 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
     if not isinstance(count, int) or count < 1 or count > 20:
         raise HTTPException(status_code=400, detail="题目数量必须在 1 到 20 之间")
 
-    valid_types = {"single_choice", "true_false"}
+    valid_types = {"single_choice", "multiple_choice", "true_false", "fill_blank", "short_answer"}
     for qt in question_types:
         if qt not in valid_types:
             raise HTTPException(status_code=400, detail=f"不支持的题型：{qt}")
@@ -180,7 +180,6 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
     created = []
     skipped = 0
     duplicate_skipped = 0
-    invalid_skipped = 0
     existing_stems = build_existing_question_stem_set(db, kp_id)
     for q in raw_questions:
         qt = q.get("question_type")
@@ -188,43 +187,10 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
         answer = q.get("answer", "").strip()
         options = q.get("options", [])
 
-        if not stem or not answer:
-            skipped += 1
-            invalid_skipped += 1
-            continue
-
         stem_normalized = normalize_stem(stem)
         if not stem_normalized or stem_normalized in existing_stems:
             skipped += 1
             duplicate_skipped += 1
-            continue
-
-        # 校验单选题
-        if qt == "single_choice":
-            keys = {o.get("key") for o in options}
-            if keys != {"A", "B", "C", "D"}:
-                skipped += 1
-                invalid_skipped += 1
-                continue
-            if answer not in ("A", "B", "C", "D"):
-                skipped += 1
-                invalid_skipped += 1
-                continue
-
-        # 校验判断题
-        elif qt == "true_false":
-            keys = {o.get("key") for o in options}
-            if keys != {"true", "false"}:
-                skipped += 1
-                invalid_skipped += 1
-                continue
-            if answer not in ("true", "false"):
-                skipped += 1
-                invalid_skipped += 1
-                continue
-        else:
-            skipped += 1
-            invalid_skipped += 1
             continue
 
         difficulty = q.get("difficulty", "medium")
@@ -247,9 +213,9 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
         existing_stems.add(stem_normalized)
 
     if not created:
-        if duplicate_skipped > 0 and invalid_skipped == 0:
+        if duplicate_skipped > 0:
             raise HTTPException(status_code=409, detail="生成的题目与现有题目重复，本次未新增题目")
-        raise HTTPException(status_code=500, detail="AI 返回的题目格式不符合要求，请重试")
+        raise HTTPException(status_code=500, detail="未生成新题目，请重试")
 
     db.commit()
 

@@ -202,6 +202,11 @@ function importanceLabel(v: string) {
   return { high: '重点', medium: '普通', low: '低频' }[v] || v
 }
 
+function isOptionAnswer(answer: string, key: string) {
+  const normalized = (answer || '').split(',').map((v) => v.trim())
+  return normalized.includes(key)
+}
+
 async function handleGenerateQuestions() {
   if (!kp.value) return
   if (genCount.value < 1 || genCount.value > 20) {
@@ -423,7 +428,10 @@ onMounted(async () => {
           <el-form-item label="题型">
             <el-checkbox-group v-model="genTypes">
               <el-checkbox value="single_choice">单选题</el-checkbox>
+              <el-checkbox value="multiple_choice">多选题</el-checkbox>
               <el-checkbox value="true_false">判断题</el-checkbox>
+              <el-checkbox value="fill_blank">填空题</el-checkbox>
+              <el-checkbox value="short_answer">简答题</el-checkbox>
             </el-checkbox-group>
           </el-form-item>
           <el-form-item label="题目数量">
@@ -443,7 +451,7 @@ onMounted(async () => {
             <div v-for="q in genResult.questions" :key="q.id" class="q-item">
               <div class="q-stem">{{ q.stem }}</div>
               <div class="q-options">
-                <span v-for="opt in (q.options || [])" :key="opt.key" class="q-opt" :class="{ answer: opt.key === q.answer }">
+                <span v-for="opt in (q.options || [])" :key="opt.key" class="q-opt" :class="{ answer: isOptionAnswer(q.answer, opt.key) }">
                   {{ opt.key }}. {{ opt.text }}
                 </span>
               </div>
