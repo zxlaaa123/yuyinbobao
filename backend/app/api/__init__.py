@@ -17,6 +17,7 @@ from .routes.export import router as export_router
 from .routes.backups import router as backups_router
 from .routes.study_sessions import router as study_sessions_router
 from .routes.ai_call_logs import router as ai_call_logs_router
+from .routes.search import router as search_router
 
 api_router = APIRouter()
 api_router.include_router(knowledge_bases_router)
@@ -37,3 +38,4 @@ api_router.include_router(export_router)
 api_router.include_router(backups_router)
 api_router.include_router(study_sessions_router)
 api_router.include_router(ai_call_logs_router)
+api_router.include_router(search_router)

@@ -2,12 +2,18 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { checkHealth } from '../api/health'
+import { searchLocal, type SearchResult } from '../api/search'
 import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from '../utils/theme'
 
 const router = useRouter()
 const route = useRoute()
 const backendStatus = ref<'loading' | 'ok' | 'error'>('loading')
 const currentTheme = ref<ThemeName>(getStoredTheme())
+const searchKeyword = ref('')
+const searchResults = ref<SearchResult[]>([])
+const searchLoading = ref(false)
+const searchTouched = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 async function fetchHealth() {
   try {
@@ -26,6 +32,42 @@ onMounted(() => {
 function handleThemeChange(theme: ThemeName) {
   currentTheme.value = theme
   applyTheme(theme)
+}
+
+function handleSearchInput() {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+  }
+  searchTimer = setTimeout(runSearch, 300)
+}
+
+async function runSearch() {
+  const keyword = searchKeyword.value.trim()
+  searchTouched.value = Boolean(keyword)
+  if (!keyword) {
+    searchResults.value = []
+    return
+  }
+  searchLoading.value = true
+  try {
+    const data = await searchLocal(keyword)
+    searchResults.value = data.results
+  } catch {
+    searchResults.value = []
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+function goSearchResult(item: SearchResult) {
+  router.push(item.target_url)
+  searchKeyword.value = ''
+  searchResults.value = []
+  searchTouched.value = false
+}
+
+function resultTypeLabel(type: SearchResult['type']) {
+  return type === 'knowledge_point' ? '知识点' : '资料'
 }
 
 const menuItems = [
@@ -71,6 +113,32 @@ const menuItems = [
 
     <main class="main">
       <div class="top-bar">
+        <div class="global-search">
+          <el-input
+            v-model="searchKeyword"
+            placeholder="搜索知识点或资料..."
+            clearable
+            @input="handleSearchInput"
+            @clear="handleSearchInput"
+            @keyup.enter="runSearch"
+          />
+          <div v-if="searchTouched" class="search-panel">
+            <div v-if="searchLoading" class="search-empty">正在搜索...</div>
+            <template v-else-if="searchResults.length > 0">
+              <button
+                v-for="item in searchResults"
+                :key="`${item.type}-${item.id}`"
+                class="search-item"
+                @click="goSearchResult(item)"
+              >
+                <span class="search-type">{{ resultTypeLabel(item.type) }}</span>
+                <span class="search-title">{{ item.title }}</span>
+                <span class="search-summary">{{ item.summary || '暂无摘要' }}</span>
+              </button>
+            </template>
+            <div v-else class="search-empty">没有找到相关结果</div>
+          </div>
+        </div>
         <div class="theme-switch">
           <span class="theme-label">配色</span>
           <div class="theme-buttons">
@@ -249,6 +317,85 @@ const menuItems = [
   color: var(--muted);
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.global-search {
+  position: relative;
+  width: min(360px, 100%);
+}
+
+.search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffaf0;
+  box-shadow: 0 18px 40px rgba(31, 50, 40, 0.18);
+  max-height: 360px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.search-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.search-panel::-webkit-scrollbar-track {
+  background: rgba(32, 79, 61, 0.06);
+  border-radius: 999px;
+}
+
+.search-panel::-webkit-scrollbar-thumb {
+  background: rgba(32, 79, 61, 0.28);
+  border-radius: 999px;
+}
+
+.search-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.search-item:hover {
+  background: var(--sidebar-hover);
+}
+
+.search-type {
+  width: fit-content;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(32, 79, 61, 0.08);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.search-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.search-summary {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.search-empty {
+  padding: 14px 10px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .theme-switch {

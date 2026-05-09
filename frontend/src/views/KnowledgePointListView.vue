@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoints, deleteKnowledgePoint } from '../api/knowledgePoint'
 import { getKnowledgeBasesForSelect } from '../api/material'
@@ -11,6 +11,7 @@ import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const router = useRouter()
+const route = useRoute()
 const knowledgePoints = ref<KnowledgePoint[]>([])
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const loading = ref(false)
@@ -20,8 +21,16 @@ const searchKeyword = ref('')
 const selectedIds = ref<number[]>([])
 const batchLoading = ref(false)
 
+const routeMaterialId = computed(() => {
+  const value = Number(route.query.material_id)
+  return Number.isFinite(value) && value > 0 ? value : undefined
+})
+
 const filteredList = computed(() => {
   let list = knowledgePoints.value
+  if (routeMaterialId.value) {
+    list = list.filter((kp) => kp.material_id === routeMaterialId.value)
+  }
   if (filterKB.value) {
     list = list.filter((kp) => kp.knowledge_base_id === filterKB.value)
   }
@@ -73,6 +82,10 @@ async function handleDelete(kp: KnowledgePoint) {
   }
 }
 
+function clearMaterialFilter() {
+  router.push('/knowledge-points')
+}
+
 function handleSelectionChange(selection: KnowledgePoint[]) {
   selectedIds.value = selection.map((kp) => kp.id)
 }
@@ -112,6 +125,13 @@ function importanceTag(importance: string) {
   return map[importance] || { label: importance, class: '' }
 }
 
+watch(
+  () => route.query.material_id,
+  () => {
+    selectedIds.value = []
+  }
+)
+
 onMounted(fetchData)
 </script>
 
@@ -127,6 +147,9 @@ onMounted(fetchData)
 
     <!-- 筛选栏 -->
     <div class="filters">
+      <el-tag v-if="routeMaterialId" closable @close="clearMaterialFilter">
+        当前资料 ID：{{ routeMaterialId }}
+      </el-tag>
       <el-select v-model="filterKB" placeholder="全部知识库" clearable style="width: 200px">
         <el-option v-for="kb in knowledgeBases" :key="kb.id" :label="kb.name" :value="kb.id" />
       </el-select>
@@ -160,7 +183,7 @@ onMounted(fetchData)
 
     <!-- 空状态 -->
     <div v-if="!loading && filteredList.length === 0" class="empty">
-      暂无知识点，请先在「资料导入」中提取知识点。
+      {{ routeMaterialId ? '当前资料下暂无知识点' : '暂无知识点，请先在「资料导入」中提取知识点。' }}
     </div>
 
     <!-- 表格列表 -->
