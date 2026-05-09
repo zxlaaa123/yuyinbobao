@@ -7,6 +7,7 @@ from .wrong_question import WrongQuestion
 from .audio_file import AudioFile
 from .app_setting import AppSetting
 from .review_task import ReviewTask
+from .flashcard import Flashcard
 
 __all__ = [
     "KnowledgeBase",
@@ -18,4 +19,5 @@ __all__ = [
     "AudioFile",
     "AppSetting",
     "ReviewTask",
+    "Flashcard",
 ]

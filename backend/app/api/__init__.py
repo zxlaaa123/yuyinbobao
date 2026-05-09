@@ -12,6 +12,8 @@ from .routes.settings import router as settings_router
 from .routes.dashboard import router as dashboard_router
 from .routes.stats import router as stats_router
 from .routes.review import router as review_router
+from .routes.flashcards import router as flashcards_router
+from .routes.export import router as export_router
 
 api_router = APIRouter()
 api_router.include_router(knowledge_bases_router)
@@ -27,3 +29,5 @@ api_router.include_router(settings_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(stats_router)
 api_router.include_router(review_router)
+api_router.include_router(flashcards_router)
+api_router.include_router(export_router)

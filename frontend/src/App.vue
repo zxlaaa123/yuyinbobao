@@ -2,10 +2,12 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { checkHealth } from './api/health'
+import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from './utils/theme'
 
 const router = useRouter()
 const route = useRoute()
 const backendStatus = ref<'loading' | 'ok' | 'error'>('loading')
+const currentTheme = ref<ThemeName>(getStoredTheme())
 
 async function fetchHealth() {
   try {
@@ -17,8 +19,14 @@ async function fetchHealth() {
 }
 
 onMounted(() => {
+  applyTheme(currentTheme.value)
   fetchHealth()
 })
+
+function handleThemeChange(theme: ThemeName) {
+  currentTheme.value = theme
+  applyTheme(theme)
+}
 
 const menuItems = [
   { key: '/dashboard', label: '首页', icon: '🏠' },
@@ -44,6 +52,10 @@ const menuItems = [
           <p>知识点学习与音频播报系统</p>
         </div>
       </div>
+      <div class="brand-note">
+        <span class="note-chip">Study Engine</span>
+        <p>把资料整理成知识点、题目、复习任务和音频卡片。</p>
+      </div>
       <nav class="nav">
         <button
           v-for="item in menuItems"
@@ -61,6 +73,20 @@ const menuItems = [
     <main class="main">
       <!-- 顶部状态条 -->
       <div class="top-bar">
+        <div class="theme-switch">
+          <span class="theme-label">配色</span>
+          <div class="theme-buttons">
+            <button
+              v-for="theme in THEME_OPTIONS"
+              :key="theme.key"
+              class="theme-btn"
+              :class="{ active: currentTheme === theme.key }"
+              @click="handleThemeChange(theme.key)"
+            >
+              {{ theme.label }}
+            </button>
+          </div>
+        </div>
         <div class="status-pill" :class="backendStatus">
           <span class="dot"></span>
           <span v-if="backendStatus === 'loading'">正在连接后端...</span>
@@ -78,101 +104,199 @@ const menuItems = [
 <style scoped>
 .app-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 290px 1fr;
   min-height: 100vh;
 }
 
 .sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(18px);
-  border-right: 1px solid #e6eaf2;
-  padding: 22px 16px;
+  background:
+    linear-gradient(180deg, var(--sidebar-bg-start), var(--sidebar-bg-end));
+  border-right: 1px solid var(--line);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.55);
+  padding: 26px 18px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
+  min-height: 100vh;
 }
 
 .brand {
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 8px 8px 18px;
-  border-bottom: 1px solid #e6eaf2;
+  padding: 8px 10px 18px;
+  border-bottom: 1px solid var(--line);
 }
 
 .logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #4f7cff, #7c3aed);
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #204f3d, #133428);
   display: grid;
   place-items: center;
-  color: #fff;
+  color: #f7e8cd;
   font-weight: 900;
-  font-size: 16px;
-  box-shadow: 0 12px 26px rgba(79, 124, 255, 0.26);
+  font-size: 17px;
+  box-shadow: 0 16px 28px rgba(30, 74, 58, 0.26);
+  border: 1px solid rgba(255, 239, 205, 0.34);
 }
 
 .brand-text h1 {
-  font-size: 16px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
   margin: 0;
 }
 
 .brand-text p {
   font-size: 12px;
-  color: #667085;
+  color: var(--muted);
   margin: 4px 0 0;
+}
+
+.brand-note {
+  margin: 0 8px;
+  padding: 16px 16px 18px;
+  border-radius: 20px;
+  background: var(--sidebar-card);
+  border: 1px solid var(--panel-accent);
+  box-shadow: var(--shadow-soft);
+}
+
+.note-chip {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(32, 79, 61, 0.08);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brand-note p {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .nav button {
   border: 0;
   background: transparent;
-  color: #667085;
+  color: #566052;
   font-size: 15px;
   text-align: left;
-  padding: 12px 14px;
-  border-radius: 15px;
+  padding: 14px 16px;
+  border-radius: 18px;
   cursor: pointer;
-  transition: 0.16s;
+  transition: 0.18s ease;
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+  position: relative;
 }
 
 .nav button:hover {
-  background: #edf3ff;
-  color: #315de6;
-  transform: translateX(2px);
+  background: var(--sidebar-hover);
+  color: var(--green);
+  transform: translateX(3px);
+  box-shadow: var(--shadow-soft);
 }
 
 .nav button.active {
-  background: linear-gradient(135deg, #4f7cff, #6b8dff);
-  color: #fff;
-  box-shadow: 0 12px 24px rgba(79, 124, 255, 0.24);
+  background: linear-gradient(135deg, #204f3d, #2c654f);
+  color: var(--sidebar-active-text);
+  box-shadow: 0 16px 28px rgba(32, 79, 61, 0.26);
+}
+
+.nav button.active::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-soft);
+  box-shadow: 0 0 0 5px rgba(230, 201, 152, 0.18);
 }
 
 .icon {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .main {
-  padding: 24px 30px 42px;
+  padding: 30px 34px 48px;
   min-width: 0;
 }
 
 .top-bar {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 24px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 26px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.top-bar::before {
+  content: "学习控制台";
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.theme-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.theme-label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.theme-buttons {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--sidebar-card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.theme-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.theme-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.theme-btn.active {
+  background: var(--green);
+  color: #fef6e7;
 }
 
 .status-pill {
@@ -180,27 +304,28 @@ const menuItems = [
   align-items: center;
   gap: 8px;
   border-radius: 99px;
-  padding: 8px 14px;
+  padding: 10px 16px;
   font-size: 13px;
   white-space: nowrap;
+  box-shadow: var(--shadow-soft);
 }
 
 .status-pill.ok {
-  background: #e9fbf5;
-  border: 1px solid #c8f4e4;
-  color: #087a59;
+  background: rgba(228, 243, 235, 0.95);
+  border: 1px solid rgba(47, 111, 87, 0.18);
+  color: #215844;
 }
 
 .status-pill.error {
-  background: #fff0f0;
-  border: 1px solid #ffd1d1;
-  color: #a61b1b;
+  background: #fff3ee;
+  border: 1px solid rgba(181, 80, 44, 0.18);
+  color: #a13e20;
 }
 
 .status-pill.loading {
-  background: #fff8e7;
-  border: 1px solid #ffe7b8;
-  color: #a06000;
+  background: #fbf2df;
+  border: 1px solid rgba(176, 122, 42, 0.18);
+  color: #8d6020;
 }
 
 .dot {
@@ -211,23 +336,41 @@ const menuItems = [
 }
 
 .status-pill.ok .dot {
-  background: #13b981;
-  box-shadow: 0 0 0 6px rgba(19, 185, 129, 0.12);
+  background: #2f6f57;
+  box-shadow: 0 0 0 6px rgba(47, 111, 87, 0.12);
 }
 
 .status-pill.error .dot {
-  background: #ef4444;
-  box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.12);
+  background: #c25539;
+  box-shadow: 0 0 0 6px rgba(194, 85, 57, 0.12);
 }
 
 .status-pill.loading .dot {
-  background: #f59e0b;
-  box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.12);
+  background: var(--gold);
+  box-shadow: 0 0 0 6px rgba(176, 122, 42, 0.12);
   animation: pulse 1.2s infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+@media (max-width: 980px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: relative;
+    height: auto;
+    min-height: auto;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
 }
 </style>

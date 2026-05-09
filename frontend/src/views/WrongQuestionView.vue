@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getWrongQuestions, markMastered, unmarkMastered, deleteWrongQuestion } from '../api/wrongQuestion'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import { generateWrongQuestionAudio } from '../api/audio'
+import { exportWrongQuestionsCsv } from '../api/export'
 import type { WrongQuestion } from '../api/wrongQuestion'
 import type { KnowledgeBase } from '../api/material'
 
@@ -98,6 +99,11 @@ async function handleDelete(wq: WrongQuestion) {
   }
 }
 
+function handleExport() {
+  exportWrongQuestionsCsv(filterKB.value, filterMastered.value)
+  ElMessage.success('已开始导出错题 CSV')
+}
+
 onMounted(fetchData)
 </script>
 
@@ -108,6 +114,7 @@ onMounted(fetchData)
         <h2>错题本</h2>
         <p>复习答错的题目，标记已掌握。</p>
       </div>
+      <el-button @click="handleExport">导出 CSV</el-button>
     </div>
 
     <!-- 筛选 -->
@@ -211,7 +218,7 @@ onMounted(fetchData)
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -228,13 +235,14 @@ onMounted(fetchData)
   gap: 12px;
   margin-bottom: 16px;
   padding: 10px 16px;
-  background: #edf3ff;
+  background: var(--panel-strong);
   border-radius: 12px;
+  border: 1px solid var(--line);
 }
 
 .batch-info {
   font-size: 14px;
-  color: #315de6;
+  color: var(--green);
   font-weight: 600;
   flex: 1;
 }
@@ -242,8 +250,13 @@ onMounted(fetchData)
 .empty {
   text-align: center;
   padding: 60px 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 15px;
+}
+
+:deep(.el-table) {
+  border-radius: 18px;
+  overflow: hidden;
 }
 
 .badge {
@@ -255,17 +268,17 @@ onMounted(fetchData)
 }
 
 .badge.mastered {
-  background: #fff0f0;
-  color: #a61b1b;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .badge.mastered.active {
-  background: #e9fbf5;
-  color: #087a59;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .badge.count {
-  background: #fff8e7;
-  color: #a06000;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 </style>

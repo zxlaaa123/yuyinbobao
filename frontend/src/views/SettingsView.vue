@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getSettings, saveSettings, testAiConnection, testTtsConnection } from '../api/setting'
+import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from '../utils/theme'
 
 const form = reactive({
   AI_PROVIDER: '',
@@ -25,6 +26,7 @@ const testingAi = ref(false)
 const testingTts = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const ttsTestResult = ref<{ success: boolean; message: string } | null>(null)
+const selectedTheme = ref<ThemeName>(getStoredTheme())
 
 async function fetchSettings() {
   try {
@@ -96,6 +98,12 @@ async function handleTestTts() {
 }
 
 onMounted(fetchSettings)
+
+function handleThemeChange(value: ThemeName) {
+  selectedTheme.value = value
+  applyTheme(value)
+  ElMessage.success(`已切换到${THEME_OPTIONS.find((item) => item.key === value)?.label || '新主题'}`)
+}
 </script>
 
 <template>
@@ -108,6 +116,28 @@ onMounted(fetchSettings)
     </div>
 
     <div class="settings-grid">
+      <div class="settings-card theme-card">
+        <div class="card-title">
+          <h3>界面主题</h3>
+          <p>切换整站配色风格，选择会自动保存在当前浏览器。</p>
+        </div>
+        <div class="theme-list">
+          <button
+            v-for="theme in THEME_OPTIONS"
+            :key="theme.key"
+            class="theme-option"
+            :class="{ active: selectedTheme === theme.key }"
+            @click="handleThemeChange(theme.key)"
+          >
+            <div class="theme-swatch" :class="theme.key"></div>
+            <div class="theme-meta">
+              <strong>{{ theme.label }}</strong>
+              <span>{{ theme.description }}</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <!-- AI 模型设置 -->
       <div class="settings-card">
         <div class="card-title">
@@ -227,7 +257,7 @@ onMounted(fetchSettings)
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -238,10 +268,10 @@ onMounted(fetchSettings)
 }
 
 .settings-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
+  box-shadow: var(--shadow-soft);
   padding: 28px;
   display: flex;
   flex-direction: column;
@@ -255,8 +285,78 @@ onMounted(fetchSettings)
 
 .card-title p {
   margin: 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 13px;
+}
+
+.theme-card {
+  grid-column: 1 / -1;
+}
+
+.theme-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.theme-option {
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 18px;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  text-align: left;
+  transition: 0.18s ease;
+}
+
+.theme-option:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+.theme-option.active {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(32, 79, 61, 0.10);
+}
+
+.theme-swatch {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.theme-swatch.warm-paper {
+  background: linear-gradient(145deg, #204f3d, #f3efe6 55%, #b07a2a);
+}
+
+.theme-swatch.night-focus {
+  background: linear-gradient(145deg, #131713, #2a342c 55%, #c9a15f);
+}
+
+.theme-swatch.clear-sky {
+  background: linear-gradient(145deg, #2f5f88, #edf5fb 55%, #4b90d9);
+}
+
+.theme-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.theme-meta strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.theme-meta span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .el-form {
@@ -274,7 +374,7 @@ onMounted(fetchSettings)
 .field-tip {
   margin-top: 4px;
   font-size: 12px;
-  color: #667085;
+  color: var(--muted);
   line-height: 1.4;
 }
 
@@ -286,17 +386,21 @@ onMounted(fetchSettings)
 }
 
 .test-result.ok {
-  background: #e9fbf5;
-  color: #087a59;
+  background: rgba(228, 243, 235, 0.95);
+  color: #215844;
 }
 
 .test-result.fail {
-  background: #fff0f0;
-  color: #a61b1b;
+  background: #fff3ee;
+  color: #a13e20;
 }
 
 @media (max-width: 768px) {
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-list {
     grid-template-columns: 1fr;
   }
 }

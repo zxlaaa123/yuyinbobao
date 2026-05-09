@@ -144,14 +144,14 @@ onMounted(fetchList)
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
 .empty {
   text-align: center;
   padding: 60px 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 15px;
 }
 
@@ -162,10 +162,10 @@ onMounted(fetchList)
 }
 
 .kb-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
+  box-shadow: var(--shadow-soft);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -179,7 +179,7 @@ onMounted(fetchList)
 
 .kb-info p {
   margin: 0 0 10px;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
 }
@@ -188,7 +188,7 @@ onMounted(fetchList)
   display: flex;
   gap: 16px;
   font-size: 13px;
-  color: #667085;
+  color: var(--muted);
 }
 
 .kb-actions {

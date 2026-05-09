@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 .DS_Store
 *.exe
+*.msi
+*.diagcab
+scripts/_test_*.py
+gitignore.txt

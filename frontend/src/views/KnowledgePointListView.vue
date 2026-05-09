@@ -5,6 +5,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getKnowledgePoints, deleteKnowledgePoint } from '../api/knowledgePoint'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import { generateBatchAudio } from '../api/audio'
+import { exportKnowledgePointsCsv } from '../api/export'
 import type { KnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgeBase } from '../api/material'
 
@@ -96,6 +97,11 @@ async function handleBatchGenerate() {
   }
 }
 
+function handleExport() {
+  exportKnowledgePointsCsv(filterKB.value)
+  ElMessage.success('已开始导出知识点 CSV')
+}
+
 function importanceTag(importance: string) {
   const map: Record<string, { label: string; class: string }> = {
     high: { label: '重点', class: 'high' },
@@ -115,6 +121,7 @@ onMounted(fetchData)
         <h2>知识点</h2>
         <p>查看、筛选、管理 AI 提取的知识点。</p>
       </div>
+      <el-button @click="handleExport">导出 CSV</el-button>
     </div>
 
     <!-- 筛选栏 -->
@@ -220,7 +227,7 @@ onMounted(fetchData)
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -237,13 +244,14 @@ onMounted(fetchData)
   gap: 12px;
   margin-bottom: 16px;
   padding: 10px 16px;
-  background: #edf3ff;
+  background: var(--panel-strong);
   border-radius: 12px;
+  border: 1px solid var(--line);
 }
 
 .batch-info {
   font-size: 14px;
-  color: #315de6;
+  color: var(--green);
   font-weight: 600;
   flex: 1;
 }
@@ -251,13 +259,13 @@ onMounted(fetchData)
 .empty {
   text-align: center;
   padding: 60px 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 15px;
 }
 
 .kp-title-link {
   cursor: pointer;
-  color: #315de6;
+  color: var(--green);
   font-weight: 600;
 }
 
@@ -266,7 +274,7 @@ onMounted(fetchData)
 }
 
 .kp-summary-cell {
-  color: #667085;
+  color: var(--muted);
   font-size: 13px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -283,18 +291,18 @@ onMounted(fetchData)
 }
 
 .importance-badge.high {
-  background: #fff0f0;
-  color: #a61b1b;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .importance-badge.medium {
-  background: #fff8e7;
-  color: #a06000;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .importance-badge.low {
-  background: #e9fbf5;
-  color: #087a59;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .tag {
@@ -302,8 +310,8 @@ onMounted(fetchData)
   padding: 2px 8px;
   border-radius: 99px;
   font-size: 12px;
-  background: #edf3ff;
-  color: #315de6;
+  background: var(--panel-strong);
+  color: var(--green);
   margin-right: 4px;
   margin-bottom: 2px;
 }
@@ -311,7 +319,7 @@ onMounted(fetchData)
 .kp-stat {
   display: block;
   font-size: 12px;
-  color: #667085;
+  color: var(--muted);
   line-height: 1.6;
 }
 </style>

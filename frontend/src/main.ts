@@ -14,6 +14,7 @@ import WrongQuestionView from './views/WrongQuestionView.vue'
 import AudioView from './views/AudioView.vue'
 import SettingsView from './views/SettingsView.vue'
 import ReviewView from './views/ReviewView.vue'
+import { applyTheme, getStoredTheme } from './utils/theme'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -33,6 +34,8 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
 })
+
+applyTheme(getStoredTheme())
 
 const app = createApp(App)
 app.use(ElementPlus)

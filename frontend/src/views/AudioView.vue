@@ -159,7 +159,7 @@ onMounted(async () => {
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -173,7 +173,7 @@ onMounted(async () => {
 .empty {
   text-align: center;
   padding: 60px 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 15px;
 }
 
@@ -184,10 +184,10 @@ onMounted(async () => {
 }
 
 .audio-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
+  box-shadow: var(--shadow-soft);
   padding: 20px;
   display: flex;
   align-items: center;
@@ -201,7 +201,7 @@ onMounted(async () => {
 .audio-title {
   font-size: 15px;
   font-weight: 600;
-  color: #182033;
+  color: var(--text);
   margin-bottom: 8px;
 }
 
@@ -220,29 +220,29 @@ onMounted(async () => {
 }
 
 .status-badge.ok {
-  background: #e9fbf5;
-  color: #087a59;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .status-badge.error {
-  background: #fff0f0;
-  color: #a61b1b;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .status-badge.loading {
-  background: #fff8e7;
-  color: #a06000;
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .time {
   font-size: 12px;
-  color: #667085;
+  color: var(--muted);
 }
 
 .error-msg {
   margin-top: 6px;
   font-size: 12px;
-  color: #a61b1b;
+  color: var(--danger-text);
 }
 
 .audio-player {

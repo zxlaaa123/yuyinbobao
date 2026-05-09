@@ -239,17 +239,17 @@ onMounted(fetchKBs)
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
 .setup-card,
 .practice-card,
 .result-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
+  box-shadow: var(--shadow-soft);
   padding: 28px;
 }
 
@@ -270,7 +270,7 @@ onMounted(fetchKBs)
 .progress-bar {
   position: relative;
   height: 28px;
-  background: #f0f2f5;
+  background: var(--card-2);
   border-radius: 14px;
   overflow: hidden;
   margin-bottom: 24px;
@@ -278,7 +278,7 @@ onMounted(fetchKBs)
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4f7cff, #7c3aed);
+  background: linear-gradient(90deg, var(--green), var(--gold));
   border-radius: 14px;
   transition: width 0.3s;
 }
@@ -290,7 +290,7 @@ onMounted(fetchKBs)
   transform: translate(-50%, -50%);
   font-size: 13px;
   font-weight: 600;
-  color: #344054;
+  color: var(--text);
 }
 
 /* 题目 */
@@ -300,15 +300,15 @@ onMounted(fetchKBs)
   border-radius: 99px;
   font-size: 12px;
   font-weight: 600;
-  background: #edf3ff;
-  color: #315de6;
+  background: var(--panel-strong);
+  color: var(--green);
   margin-bottom: 12px;
 }
 
 .q-stem {
   font-size: 17px;
   font-weight: 600;
-  color: #182033;
+  color: var(--text);
   line-height: 1.6;
   margin-bottom: 20px;
 }
@@ -326,34 +326,34 @@ onMounted(fetchKBs)
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border: 1px solid #dbe2ee;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .option:hover:not([disabled]) {
-  border-color: #4f7cff;
-  background: #edf3ff;
+  border-color: var(--green);
+  background: var(--panel-strong);
 }
 
 .option.selected {
-  border-color: #4f7cff;
-  background: #edf3ff;
+  border-color: var(--green);
+  background: var(--panel-strong);
   font-weight: 600;
 }
 
 .option.correct {
-  border-color: #13b981;
-  background: #e9fbf5;
-  color: #087a59;
+  border-color: var(--green);
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .option.wrong {
-  border-color: #ef4444;
-  background: #fff0f0;
-  color: #a61b1b;
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .option[disabled] {
@@ -384,23 +384,23 @@ onMounted(fetchKBs)
 }
 
 .result-badge.ok {
-  background: #e9fbf5;
-  color: #087a59;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .result-badge.bad {
-  background: #fff0f0;
-  color: #a61b1b;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .result-info p {
   margin: 4px 0;
   font-size: 14px;
-  color: #344054;
+  color: var(--text);
 }
 
 .result-info .analysis {
-  color: #667085;
+  color: var(--muted);
   line-height: 1.6;
 }
 
@@ -434,18 +434,18 @@ onMounted(fetchKBs)
 
 .stat-item span {
   font-size: 13px;
-  color: #667085;
+  color: var(--muted);
 }
 
 .stat-item.correct b {
-  color: #13b981;
+  color: var(--green);
 }
 
 .stat-item.wrong b {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .stat-item.rate b {
-  color: #4f7cff;
+  color: var(--gold);
 }
 </style>

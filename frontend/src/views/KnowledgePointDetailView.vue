@@ -7,6 +7,8 @@ import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint
 import { generateQuestions } from '../api/question'
 import type { GeneratedQuestion } from '../api/question'
 import { generateAudio, getAudioFiles } from '../api/audio'
+import { getFlashcards, createFlashcard, generateFlashcards } from '../api/flashcard'
+import type { Flashcard } from '../api/flashcard'
 
 function getAudioUrl(fileUrl: string | null): string {
   if (!fileUrl) return ''
@@ -25,6 +27,14 @@ const editForm = reactive<KnowledgePointUpdate>({})
 const audioLoading = ref(false)
 const audioFileUrl = ref<string | null>(null)
 const audioError = ref<string | null>(null)
+const flashcards = ref<Flashcard[]>([])
+const flashcardsLoading = ref(false)
+const flashcardsGenerating = ref(false)
+const flashcardForm = reactive({
+  front: '',
+  back: '',
+  flashcard_type: 'basic',
+})
 
 async function loadExistingAudio() {
   if (!kp.value) return
@@ -53,6 +63,58 @@ async function handleGenerateAudio() {
     ElMessage.error(audioError.value || '音频生成失败')
   } finally {
     audioLoading.value = false
+  }
+}
+
+async function loadFlashcards() {
+  if (!kp.value) return
+  flashcardsLoading.value = true
+  try {
+    flashcards.value = await getFlashcards(kp.value.id)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '加载闪卡失败')
+  } finally {
+    flashcardsLoading.value = false
+  }
+}
+
+async function handleCreateFlashcard() {
+  if (!kp.value) return
+  if (!flashcardForm.front.trim()) {
+    ElMessage.warning('闪卡正面不能为空')
+    return
+  }
+  if (!flashcardForm.back.trim()) {
+    ElMessage.warning('闪卡背面不能为空')
+    return
+  }
+  try {
+    const created = await createFlashcard(kp.value.id, {
+      front: flashcardForm.front,
+      back: flashcardForm.back,
+      flashcard_type: flashcardForm.flashcard_type,
+    })
+    flashcards.value = [created, ...flashcards.value]
+    flashcardForm.front = ''
+    flashcardForm.back = ''
+    flashcardForm.flashcard_type = 'basic'
+    ElMessage.success('闪卡已创建')
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '创建闪卡失败')
+  }
+}
+
+async function handleGenerateFlashcards() {
+  if (!kp.value) return
+  flashcardsGenerating.value = true
+  try {
+    const result = await generateFlashcards(kp.value.id)
+    flashcards.value = await getFlashcards(kp.value.id)
+    ElMessage.success(`已生成 ${result.created_count} 张闪卡`)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || 'AI 生成闪卡失败')
+  } finally {
+    flashcardsGenerating.value = false
   }
 }
 
@@ -167,6 +229,7 @@ async function handleGenerateQuestions() {
 onMounted(async () => {
   await fetchData()
   await loadExistingAudio()
+  await loadFlashcards()
 })
 </script>
 
@@ -242,6 +305,39 @@ onMounted(async () => {
           <ul>
             <li v-for="(p, i) in kp.examples" :key="i">{{ p }}</li>
           </ul>
+        </div>
+
+        <div class="section flashcard-section">
+          <div class="section-head">
+            <h3>闪卡</h3>
+            <el-button size="small" :loading="flashcardsGenerating" @click="handleGenerateFlashcards">
+              AI 生成闪卡
+            </el-button>
+          </div>
+
+          <div class="flashcard-form">
+            <el-input v-model="flashcardForm.front" placeholder="闪卡正面" />
+            <el-input v-model="flashcardForm.back" type="textarea" :rows="2" placeholder="闪卡背面" />
+            <div class="flashcard-form-actions">
+              <el-select v-model="flashcardForm.flashcard_type" style="width: 140px">
+                <el-option label="基础" value="basic" />
+                <el-option label="反向" value="reverse" />
+                <el-option label="填空" value="cloze" />
+              </el-select>
+              <el-button type="primary" @click="handleCreateFlashcard">新增闪卡</el-button>
+            </div>
+          </div>
+
+          <div v-if="flashcardsLoading" class="flashcard-empty">闪卡加载中...</div>
+          <div v-else-if="flashcards.length === 0" class="flashcard-empty">暂无闪卡，可手动新增或用 AI 生成。</div>
+          <div v-else class="flashcard-list">
+            <div v-for="card in flashcards" :key="card.id" class="flashcard-item">
+              <div class="flashcard-label">正面</div>
+              <div class="flashcard-text">{{ card.front }}</div>
+              <div class="flashcard-label">背面</div>
+              <div class="flashcard-text">{{ card.back }}</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -554,6 +650,59 @@ onMounted(async () => {
 .audio-section h3 {
   font-size: 16px;
   margin: 0 0 12px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.flashcard-section {
+  margin-top: 16px;
+}
+
+.flashcard-form {
+  display: grid;
+  gap: 12px;
+}
+
+.flashcard-form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.flashcard-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.flashcard-item {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(230, 234, 242, 0.95);
+  background: #f8fafc;
+}
+
+.flashcard-label {
+  font-size: 12px;
+  color: #667085;
+  margin-bottom: 4px;
+}
+
+.flashcard-text {
+  color: #101828;
+  white-space: pre-wrap;
+  margin-bottom: 10px;
+}
+
+.flashcard-empty {
+  margin-top: 12px;
+  color: #667085;
 }
 
 .audio-loading {

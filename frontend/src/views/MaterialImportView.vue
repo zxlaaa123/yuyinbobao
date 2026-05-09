@@ -212,7 +212,7 @@ onMounted(fetchKnowledgeBases)
 
 .title p {
   margin: 6px 0 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
@@ -224,10 +224,10 @@ onMounted(fetchKnowledgeBases)
 
 .form-card,
 .result-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(230, 234, 242, 0.95);
+  background: var(--paper);
+  border: 1px solid var(--line);
   border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(25, 36, 70, 0.06);
+  box-shadow: var(--shadow-soft);
   padding: 28px;
 }
 
@@ -245,18 +245,18 @@ onMounted(fetchKnowledgeBases)
   display: block;
   font-size: 14px;
   font-weight: 600;
-  color: #344054;
+  color: var(--text);
   margin-bottom: 6px;
 }
 
 .required {
-  color: #ef4444;
+  color: var(--danger);
 }
 
 .tip {
   margin-top: 6px;
   font-size: 12px;
-  color: #667085;
+  color: var(--muted);
 }
 
 .actions {
@@ -274,7 +274,7 @@ onMounted(fetchKnowledgeBases)
 
 .result-title p {
   margin: 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -282,14 +282,14 @@ onMounted(fetchKnowledgeBases)
 .loading-box {
   text-align: center;
   padding: 40px 0;
-  color: #667085;
+  color: var(--muted);
 }
 
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid #e6eaf2;
-  border-top-color: #4f7cff;
+  border: 3px solid var(--line);
+  border-top-color: var(--green);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 12px;
@@ -301,25 +301,25 @@ onMounted(fetchKnowledgeBases)
 
 .result-summary {
   padding: 12px 16px;
-  background: #edf3ff;
+  background: var(--panel-strong);
   border-radius: 12px;
   font-size: 14px;
-  color: #315de6;
+  color: var(--green);
   margin-bottom: 12px;
 }
 
 .skipped-hint {
   margin-left: 8px;
-  color: #a06000;
+  color: var(--warning-text);
   font-size: 13px;
 }
 
 .split-info {
   padding: 8px 16px;
-  background: #fff8e7;
+  background: var(--warning-bg);
   border-radius: 12px;
   font-size: 13px;
-  color: #a06000;
+  color: var(--warning-text);
   margin-bottom: 16px;
 }
 
@@ -330,10 +330,10 @@ onMounted(fetchKnowledgeBases)
 }
 
 .kp-item {
-  border: 1px solid #e6eaf2;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px 14px;
-  background: #f8fbff;
+  background: var(--card);
 }
 
 .kp-name {
@@ -353,14 +353,14 @@ onMounted(fetchKnowledgeBases)
   padding: 3px 8px;
   border-radius: 99px;
   font-size: 12px;
-  background: #edf3ff;
-  color: #315de6;
+  background: var(--panel-strong);
+  color: var(--green);
 }
 
 .empty-hint {
   text-align: center;
   padding: 40px 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
   line-height: 1.6;
 }
