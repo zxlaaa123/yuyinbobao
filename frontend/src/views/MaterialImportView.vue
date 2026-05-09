@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import { createMaterial, getKnowledgeBasesForSelect, importAndExtract, uploadTextMaterial } from '../api/material'
 import type { KnowledgeBase, ExtractResult } from '../api/material'
 import { getErrorMessage } from '../utils/error'
@@ -23,8 +24,8 @@ const extractResult = ref<ExtractResult | null>(null)
 async function fetchKnowledgeBases() {
   try {
     knowledgeBases.value = await getKnowledgeBasesForSelect()
-  } catch {
-    ElMessage.error('加载知识库列表失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载知识库列表失败'))
   }
 }
 
@@ -239,9 +240,11 @@ onMounted(fetchKnowledgeBases)
           </div>
         </div>
 
-        <div v-else class="empty-hint">
-          暂无提取结果。粘贴一段资料后点击"保存并提取知识点"试试。
-        </div>
+        <AppEmpty
+          v-else
+          title="暂无提取结果"
+          description="粘贴资料后点击「保存并提取知识点」开始。"
+        />
       </div>
     </div>
   </div>

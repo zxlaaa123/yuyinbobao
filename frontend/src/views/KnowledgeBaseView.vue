@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import {
   getKnowledgeBases,
   createKnowledgeBase,
@@ -11,17 +12,22 @@ import {
   type KnowledgeBaseUpdate,
 } from '../api/knowledgeBase'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 const knowledgeBases = ref<KnowledgeBase[]>([])
+const loading = ref(false)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const form = ref<KnowledgeBaseCreate>({ name: '', description: '' })
 
 async function fetchList() {
+  loading.value = true
   try {
     knowledgeBases.value = await getKnowledgeBases()
-  } catch {
-    ElMessage.error('加载知识库列表失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载知识库列表失败'))
+  } finally {
+    loading.value = false
   }
 }
 
@@ -59,11 +65,7 @@ async function handleSubmit() {
 
 async function handleDelete(kb: KnowledgeBase) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除知识库「${kb.name}」吗？删除后不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
-    )
+    await confirmDelete('知识库', kb.name)
     await deleteKnowledgeBase(kb.id)
     ElMessage.success('知识库已删除')
     await fetchList()
@@ -87,23 +89,27 @@ onMounted(fetchList)
       <el-button type="primary" @click="openCreate">＋ 新建知识库</el-button>
     </div>
 
-    <div v-if="knowledgeBases.length === 0" class="empty">
-      暂无知识库，点击「新建知识库」开始。
-    </div>
+    <div v-loading="loading" class="content-shell">
+      <AppEmpty
+        v-if="!loading && knowledgeBases.length === 0"
+        title="暂无知识库"
+        description="点击「新建知识库」开始整理资料和知识点。"
+      />
 
-    <div v-else class="card-grid">
-      <div v-for="kb in knowledgeBases" :key="kb.id" class="kb-card">
-        <div class="kb-info">
-          <h3>{{ kb.name }}</h3>
-          <p v-if="kb.description">{{ kb.description }}</p>
-          <div class="kb-meta">
-            <span>资料 {{ kb.material_count }} 篇</span>
-            <span>知识点 {{ kb.knowledge_point_count }} 个</span>
+      <div v-else class="card-grid">
+        <div v-for="kb in knowledgeBases" :key="kb.id" class="kb-card">
+          <div class="kb-info">
+            <h3>{{ kb.name }}</h3>
+            <p v-if="kb.description">{{ kb.description }}</p>
+            <div class="kb-meta">
+              <span>资料 {{ kb.material_count }} 篇</span>
+              <span>知识点 {{ kb.knowledge_point_count }} 个</span>
+            </div>
           </div>
-        </div>
-        <div class="kb-actions">
-          <el-button size="small" @click="openEdit(kb)">编辑</el-button>
-          <el-button size="small" type="danger" @click="handleDelete(kb)">删除</el-button>
+          <div class="kb-actions">
+            <el-button size="small" @click="openEdit(kb)">编辑</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(kb)">删除</el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -149,11 +155,8 @@ onMounted(fetchList)
   font-size: 14px;
 }
 
-.empty {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--muted);
-  font-size: 15px;
+.content-shell {
+  min-height: 180px;
 }
 
 .card-grid {

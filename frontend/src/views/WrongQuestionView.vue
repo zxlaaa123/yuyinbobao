@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import { getWrongQuestions, markMastered, unmarkMastered, deleteWrongQuestion } from '../api/wrongQuestion'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import { generateWrongQuestionAudio } from '../api/audio'
@@ -8,6 +9,7 @@ import { exportWrongQuestionsCsv } from '../api/export'
 import type { WrongQuestion } from '../api/wrongQuestion'
 import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 const wrongQuestions = ref<WrongQuestion[]>([])
 const knowledgeBases = ref<KnowledgeBase[]>([])
@@ -30,8 +32,8 @@ async function fetchData() {
   try {
     wrongQuestions.value = await getWrongQuestions()
     knowledgeBases.value = await getKnowledgeBasesForSelect()
-  } catch {
-    ElMessage.error('加载错题列表失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载错题列表失败'))
   } finally {
     loading.value = false
   }
@@ -84,11 +86,7 @@ async function handleUnmarkMastered(wq: WrongQuestion) {
 
 async function handleDelete(wq: WrongQuestion) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除这道错题记录吗？删除后不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
+    await confirmDelete('错题记录')
     await deleteWrongQuestion(wq.id)
     wrongQuestions.value = wrongQuestions.value.filter((w) => w.id !== wq.id)
     selectedIds.value = selectedIds.value.filter((id) => id !== wq.id)
@@ -145,9 +143,11 @@ onMounted(fetchData)
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!loading && filteredList.length === 0" class="empty">
-      暂无错题，继续保持。
-    </div>
+    <AppEmpty
+      v-if="!loading && filteredList.length === 0"
+      title="暂无错题"
+      description="答错的题目会自动进入这里，方便后续复习。"
+    />
 
     <!-- 错题表格 -->
     <div v-else>
@@ -246,13 +246,6 @@ onMounted(fetchData)
   color: var(--green);
   font-weight: 600;
   flex: 1;
-}
-
-.empty {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--muted);
-  font-size: 15px;
 }
 
 :deep(.el-table) {

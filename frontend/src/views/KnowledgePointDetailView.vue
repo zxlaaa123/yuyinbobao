@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import { getKnowledgePoint, updateKnowledgePoint, deleteKnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgePoint, KnowledgePointUpdate } from '../api/knowledgePoint'
 import { generateQuestions } from '../api/question'
@@ -10,6 +11,7 @@ import { generateAudio, getAudioFiles } from '../api/audio'
 import { getFlashcards, createFlashcard, generateFlashcards } from '../api/flashcard'
 import type { Flashcard } from '../api/flashcard'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 function getAudioUrl(fileUrl: string | null): string {
   if (!fileUrl) return ''
@@ -131,8 +133,8 @@ async function fetchData() {
   try {
     const id = Number(route.params.id)
     kp.value = await getKnowledgePoint(id)
-  } catch {
-    ElMessage.error('加载知识点失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载知识点失败'))
     router.push('/knowledge-points')
   } finally {
     loading.value = false
@@ -176,11 +178,7 @@ async function handleSave() {
 async function handleDelete() {
   if (!kp.value) return
   try {
-    await ElMessageBox.confirm(
-      `确定要删除知识点「${kp.value.title}」吗？删除后不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
+    await confirmDelete('知识点', kp.value.title)
     await deleteKnowledgePoint(kp.value.id)
     ElMessage.success('知识点已删除')
     router.push('/knowledge-points')
@@ -461,7 +459,7 @@ onMounted(async () => {
       </el-dialog>
     </div>
 
-    <div v-else class="empty">知识点不存在</div>
+    <AppEmpty v-else title="知识点不存在" description="该知识点可能已被删除，请返回列表重新选择。" />
   </div>
 </template>
 
@@ -782,10 +780,4 @@ onMounted(async () => {
   color: #667085;
 }
 
-.empty {
-  text-align: center;
-  padding: 60px;
-  color: #667085;
-  font-size: 15px;
-}
 </style>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import { getAudioFiles, deleteAudioFile, retryAudioFile } from '../api/audio'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import type { AudioFile } from '../api/audio'
 import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 const audioFiles = ref<AudioFile[]>([])
 const knowledgeBases = ref<KnowledgeBase[]>([])
@@ -35,8 +37,8 @@ async function fetchData() {
       audio_type: filterType.value,
       audio_format: filterFormat.value,
     })
-  } catch {
-    ElMessage.error('加载音频列表失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载音频列表失败'))
   } finally {
     loading.value = false
   }
@@ -44,11 +46,7 @@ async function fetchData() {
 
 async function handleDelete(audio: AudioFile) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除音频「${audio.title}」吗？将删除数据库记录，并尝试同步删除本地音频文件。此操作不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
+    await confirmDelete('音频', audio.title, '将删除数据库记录，并尝试同步删除本地音频文件')
     const result = await deleteAudioFile(audio.id)
     audioFiles.value = audioFiles.value.filter((a) => a.id !== audio.id)
     ElMessage.success(result.message || '音频已删除')
@@ -98,7 +96,11 @@ function formatFileSize(size: number | null): string {
 }
 
 onMounted(async () => {
-  knowledgeBases.value = await getKnowledgeBasesForSelect()
+  try {
+    knowledgeBases.value = await getKnowledgeBasesForSelect()
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载知识库列表失败'))
+  }
   await fetchData()
 })
 </script>
@@ -135,9 +137,11 @@ onMounted(async () => {
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!loading && filteredAudio.length === 0" class="empty">
-      暂无音频，请在知识点详情页生成音频。
-    </div>
+    <AppEmpty
+      v-if="!loading && filteredAudio.length === 0"
+      title="暂无音频"
+      description="请在知识点详情页生成音频，或调整当前筛选条件。"
+    />
 
     <!-- 音频列表 -->
     <div v-else class="audio-list">
@@ -213,13 +217,6 @@ onMounted(async () => {
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 20px;
-}
-
-.empty {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--muted);
-  font-size: 15px;
 }
 
 .audio-list {

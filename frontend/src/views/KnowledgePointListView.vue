@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import { getKnowledgePoints, deleteKnowledgePoint } from '../api/knowledgePoint'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import { generateBatchAudio } from '../api/audio'
@@ -9,6 +10,7 @@ import { exportKnowledgePointsCsv } from '../api/export'
 import type { KnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 const router = useRouter()
 const route = useRoute()
@@ -53,8 +55,8 @@ async function fetchData() {
   try {
     knowledgePoints.value = await getKnowledgePoints()
     knowledgeBases.value = await getKnowledgeBasesForSelect()
-  } catch {
-    ElMessage.error('加载知识点列表失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载知识点列表失败'))
   } finally {
     loading.value = false
   }
@@ -66,11 +68,7 @@ function goDetail(kp: KnowledgePoint) {
 
 async function handleDelete(kp: KnowledgePoint) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除知识点「${kp.title}」吗？删除后不可恢复。`,
-      '删除确认',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
+    await confirmDelete('知识点', kp.title)
     await deleteKnowledgePoint(kp.id)
     ElMessage.success('知识点已删除')
     selectedIds.value = selectedIds.value.filter((id) => id !== kp.id)
@@ -182,9 +180,11 @@ onMounted(fetchData)
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!loading && filteredList.length === 0" class="empty">
-      {{ routeMaterialId ? '当前资料下暂无知识点' : '暂无知识点，请先在「资料导入」中提取知识点。' }}
-    </div>
+    <AppEmpty
+      v-if="!loading && filteredList.length === 0"
+      :title="routeMaterialId ? '当前资料下暂无知识点' : '暂无知识点'"
+      :description="routeMaterialId ? '可以关闭资料筛选，查看全部知识点。' : '请先在「资料导入」中提取知识点。'"
+    />
 
     <!-- 表格列表 -->
     <div v-else>
@@ -278,13 +278,6 @@ onMounted(fetchData)
   color: var(--green);
   font-weight: 600;
   flex: 1;
-}
-
-.empty {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--muted);
-  font-size: 15px;
 }
 
 .kp-title-link {

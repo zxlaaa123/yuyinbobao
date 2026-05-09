@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { getSettings, saveSettings, testAiConnection, testTtsConnection } from '../api/setting'
 import { createBackup, deleteBackup, getBackups, restoreBackup, type BackupRecord } from '../api/backup'
 import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from '../utils/theme'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 const form = reactive({
   AI_PROVIDER: '',
@@ -66,8 +66,8 @@ async function fetchSettings() {
     const normalized = { ...data }
     normalizeNumericSettings(normalized)
     Object.assign(form, normalized)
-  } catch {
-    ElMessage.error('加载设置失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载设置失败'))
   }
 }
 
@@ -176,11 +176,7 @@ async function handleRestoreBackup(item: BackupRecord) {
 
 async function handleDeleteBackup(item: BackupRecord) {
   try {
-    await ElMessageBox.confirm(`确定要删除备份「${item.filename}」吗？`, '删除确认', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-    })
+    await confirmDelete('备份', item.filename)
     await deleteBackup(item.id)
     ElMessage.success('备份已删除')
     await fetchBackups()

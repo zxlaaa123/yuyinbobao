@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import AppEmpty from '../components/AppEmpty.vue'
 import {
   getReviewTasks,
   generateReviewTasks,
@@ -12,6 +13,7 @@ import { generateDailyReviewAudio } from '../api/audio'
 import type { ReviewTask } from '../api/review'
 import { useRouter } from 'vue-router'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
+import { confirmDelete } from '../utils/confirm'
 
 const router = useRouter()
 const tasks = ref<ReviewTask[]>([])
@@ -35,8 +37,8 @@ async function fetchTasks() {
   loading.value = true
   try {
     tasks.value = await getReviewTasks()
-  } catch {
-    ElMessage.error('加载复习任务失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载复习任务失败'))
   } finally {
     loading.value = false
   }
@@ -94,11 +96,7 @@ async function handleSnooze(task: ReviewTask) {
 
 async function handleDelete(task: ReviewTask) {
   try {
-    await ElMessageBox.confirm('确定要删除这个复习任务吗？', '删除确认', {
-      type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-    })
+    await confirmDelete('复习任务')
     await deleteReviewTask(task.id)
     ElMessage.success('任务已删除')
     await fetchTasks()
@@ -155,6 +153,19 @@ function formatDate(d: string | null): string {
 function goDetail(kpId: number) {
   router.push(`/knowledge-points/${kpId}`)
 }
+
+const emptyTitle = computed(() => {
+  if (filterStatus.value === 'today') return '暂无今日复习任务'
+  if (filterStatus.value === 'overdue') return '暂无逾期任务'
+  if (filterStatus.value === 'later') return '暂无稍后复习任务'
+  if (filterStatus.value === 'completed') return '暂无已完成任务'
+  return '暂无复习任务'
+})
+
+const emptyDescription = computed(() => {
+  if (filterStatus.value === 'today') return '点击「生成今日复习」创建今天的复习任务。'
+  return '可以切换筛选条件，或生成今日复习任务。'
+})
 
 onMounted(fetchTasks)
 </script>
@@ -213,14 +224,11 @@ onMounted(fetchTasks)
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!loading && filteredTasks.length === 0" class="empty">
-      <div class="empty-icon">📋</div>
-      <p v-if="filterStatus === 'today'">暂无今日复习任务，点击"生成今日复习"开始</p>
-      <p v-else-if="filterStatus === 'overdue'">暂无逾期任务</p>
-      <p v-else-if="filterStatus === 'later'">暂无稍后复习任务</p>
-      <p v-else-if="filterStatus === 'completed'">暂无已完成任务</p>
-      <p v-else>暂无复习任务</p>
-    </div>
+    <AppEmpty
+      v-if="!loading && filteredTasks.length === 0"
+      :title="emptyTitle"
+      :description="emptyDescription"
+    />
 
     <!-- 任务列表 -->
     <div v-else-if="!loading" class="task-list">
@@ -347,23 +355,6 @@ onMounted(fetchTasks)
 /* 筛选 */
 .filters {
   margin-bottom: 20px;
-}
-
-/* 空状态 */
-.empty {
-  text-align: center;
-  padding: 60px 0;
-  color: var(--muted);
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-}
-
-.empty p {
-  font-size: 15px;
-  margin: 0;
 }
 
 /* 任务列表 */

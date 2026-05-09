@@ -285,3 +285,49 @@ body::before {
     linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
+
+.el-button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.el-table {
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 18px 14px 32px !important;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 12px;
+  }
+
+  .header-actions,
+  .filters,
+  .batch-bar,
+  .audio-actions,
+  .kb-actions {
+    width: 100%;
+  }
+
+  .filters .el-select,
+  .filters .el-input,
+  .header-actions .el-button,
+  .batch-bar .el-button,
+  .audio-actions .el-button,
+  .kb-actions .el-button {
+    width: 100% !important;
+  }
+
+  .el-table {
+    min-width: 640px;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
