@@ -37,6 +37,7 @@ const menuItems = [
   { key: '/wrong-questions', label: '错题本', icon: '📌' },
   { key: '/review', label: '复习计划', icon: '🔄' },
   { key: '/audio', label: '音频播报', icon: '🎧' },
+  { key: '/ai-call-logs', label: 'AI 日志', icon: '📊' },
   { key: '/settings', label: '设置', icon: '⚙️' },
 ]
 </script>

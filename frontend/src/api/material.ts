@@ -26,6 +26,15 @@ export interface MaterialCreate {
   note?: string
 }
 
+export interface UploadedTextMaterial {
+  title: string
+  content: string
+  source: string
+  file_name: string
+  saved_path: string
+  content_length: number
+}
+
 export function getMaterials(knowledgeBaseId?: number) {
   const params = knowledgeBaseId ? `?knowledge_base_id=${knowledgeBaseId}` : ''
   return request.get(`/api/materials${params}`) as Promise<Material[]>
@@ -37,6 +46,14 @@ export function getMaterial(id: number) {
 
 export function createMaterial(data: MaterialCreate) {
   return request.post('/api/materials', data) as Promise<Material>
+}
+
+export function uploadTextMaterial(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/api/materials/upload-text', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }) as Promise<UploadedTextMaterial>
 }
 
 export function getKnowledgeBasesForSelect() {

@@ -9,6 +9,7 @@ import WrongQuestionView from '../views/WrongQuestionView.vue'
 import AudioView from '../views/AudioView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import ReviewView from '../views/ReviewView.vue'
+import AICallLogView from '../views/AICallLogView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -27,6 +28,7 @@ const router = createRouter({
         { path: 'wrong-questions', component: WrongQuestionView },
         { path: 'review', component: ReviewView },
         { path: 'audio', component: AudioView },
+        { path: 'ai-call-logs', component: AICallLogView },
         { path: 'settings', component: SettingsView },
       ],
     },

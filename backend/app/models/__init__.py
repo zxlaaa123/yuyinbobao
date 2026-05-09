@@ -10,6 +10,7 @@ from .review_task import ReviewTask
 from .flashcard import Flashcard
 from .backup_record import BackupRecord
 from .study_session import StudySession
+from .ai_call_log import AICallLog
 
 __all__ = [
     "KnowledgeBase",
@@ -24,4 +25,5 @@ __all__ = [
     "Flashcard",
     "BackupRecord",
     "StudySession",
+    "AICallLog",
 ]

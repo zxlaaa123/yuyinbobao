@@ -16,6 +16,8 @@ const form = reactive({
   AI_TIMEOUT: 60,
   AI_SEGMENT_SIZE: 3000,
   AI_MAX_SEGMENTS: 5,
+  AI_INPUT_PRICE_PER_1M: 0,
+  AI_OUTPUT_PRICE_PER_1M: 0,
   TTS_PROVIDER: '',
   XIAOMI_TTS_API_KEY: '',
   XIAOMI_TTS_BASE_URL: '',
@@ -40,6 +42,8 @@ const numericSettingDefaults: Record<string, number> = {
   AI_TIMEOUT: 60,
   AI_SEGMENT_SIZE: 3000,
   AI_MAX_SEGMENTS: 5,
+  AI_INPUT_PRICE_PER_1M: 0,
+  AI_OUTPUT_PRICE_PER_1M: 0,
   XIAOMI_TTS_SPEED: 1.0,
 }
 
@@ -305,6 +309,14 @@ function handleThemeChange(value: ThemeName) {
           <el-form-item label="最大分段数">
             <el-input-number v-model="form.AI_MAX_SEGMENTS" :min="1" :max="20" style="width: 100%" />
             <div class="field-tip">长文本最多分几段，超出部分合并到最后一段</div>
+          </el-form-item>
+          <el-form-item label="输入单价（元 / 百万 token）">
+            <el-input-number v-model="form.AI_INPUT_PRICE_PER_1M" :min="0" :precision="4" :step="0.1" style="width: 100%" />
+            <div class="field-tip">用于估算 AI 调用成本，价格由你按当前模型服务商填写</div>
+          </el-form-item>
+          <el-form-item label="输出单价（元 / 百万 token）">
+            <el-input-number v-model="form.AI_OUTPUT_PRICE_PER_1M" :min="0" :precision="4" :step="0.1" style="width: 100%" />
+            <div class="field-tip">日志会优先使用接口返回 token；无 token 时按字符粗略估算</div>
           </el-form-item>
         </el-form>
         <div class="card-actions">

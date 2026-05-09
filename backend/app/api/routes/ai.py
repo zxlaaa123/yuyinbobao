@@ -28,7 +28,7 @@ def _get_ai_service(db: Session) -> AIService:
         raise HTTPException(status_code=400, detail="AI API Key 未配置，请先到设置页配置")
     if not base_url:
         raise HTTPException(status_code=400, detail="AI Base URL 未配置，请先到设置页配置")
-    return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout)
+    return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout, db=db)
 
 
 def _dump_json(value) -> str | None:
@@ -81,6 +81,8 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
                 knowledge_base_name="",
                 material_title=material.title,
                 material_content=segment,
+                related_type="material",
+                related_id=material.id,
             )
         except HTTPException:
             raise
@@ -163,6 +165,8 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
             examples=_load_json(kp.examples),
             question_types=question_types,
             count=count,
+            related_type="knowledge_point",
+            related_id=kp.id,
         )
     except HTTPException:
         raise

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { createMaterial, getKnowledgeBasesForSelect, importAndExtract } from '../api/material'
+import { createMaterial, getKnowledgeBasesForSelect, importAndExtract, uploadTextMaterial } from '../api/material'
 import type { KnowledgeBase, ExtractResult } from '../api/material'
 import { getErrorMessage } from '../utils/error'
 
@@ -17,6 +17,7 @@ const form = reactive({
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const saving = ref(false)
 const extracting = ref(false)
+const uploading = ref(false)
 const extractResult = ref<ExtractResult | null>(null)
 
 async function fetchKnowledgeBases() {
@@ -86,6 +87,36 @@ async function handleSaveAndExtract() {
   }
 }
 
+async function handleFileChange(file: { raw?: File; name: string }) {
+  const rawFile = file.raw
+  if (!rawFile) {
+    ElMessage.warning('请选择 TXT 或 Markdown 文件')
+    return
+  }
+  const lowerName = rawFile.name.toLowerCase()
+  if (!lowerName.endsWith('.txt') && !lowerName.endsWith('.md') && !lowerName.endsWith('.markdown')) {
+    ElMessage.warning('仅支持 TXT 或 Markdown 文件')
+    return
+  }
+
+  uploading.value = true
+  try {
+    const result = await uploadTextMaterial(rawFile)
+    form.title = result.title
+    form.content = result.content
+    form.source = result.file_name
+    if (!form.note.trim()) {
+      form.note = `上传文件：${result.file_name}`
+    }
+    extractResult.value = null
+    ElMessage.success(`文件解析成功，共 ${result.content_length} 字`)
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '文件上传解析失败，请重试'))
+  } finally {
+    uploading.value = false
+  }
+}
+
 function resetForm() {
   form.knowledge_base_id = undefined
   form.title = ''
@@ -130,6 +161,25 @@ onMounted(fetchKnowledgeBases)
         </div>
 
         <div class="form-item">
+          <label>上传文件</label>
+          <el-upload
+            class="upload-box"
+            drag
+            action="#"
+            accept=".txt,.md,.markdown,text/plain,text/markdown"
+            :auto-upload="false"
+            :show-file-list="false"
+            :disabled="saving || extracting || uploading"
+            :on-change="handleFileChange"
+          >
+            <div class="upload-text">
+              <strong>{{ uploading ? '正在解析文件...' : '拖拽或点击上传 TXT / Markdown' }}</strong>
+              <span>解析后会自动填入标题、来源和正文</span>
+            </div>
+          </el-upload>
+        </div>
+
+        <div class="form-item">
           <label>资料正文 <span class="required">*</span></label>
           <el-input
             v-model="form.content"
@@ -151,7 +201,7 @@ onMounted(fetchKnowledgeBases)
 
         <div class="actions">
           <el-button @click="resetForm">清空</el-button>
-          <el-button type="primary" :loading="saving || extracting" @click="handleSave">保存资料</el-button>
+          <el-button type="primary" :loading="saving || uploading" :disabled="extracting" @click="handleSave">保存资料</el-button>
           <el-button type="success" :loading="extracting" @click="handleSaveAndExtract">保存并提取知识点</el-button>
         </div>
       </div>
@@ -258,6 +308,30 @@ onMounted(fetchKnowledgeBases)
   margin-top: 6px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.upload-box :deep(.el-upload) {
+  width: 100%;
+}
+
+.upload-box :deep(.el-upload-dragger) {
+  width: 100%;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.upload-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.upload-text span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .actions {

@@ -21,7 +21,7 @@ def _get_ai_service(db: Session) -> AIService:
         raise HTTPException(status_code=400, detail="AI API Key 未配置，请先到设置页配置")
     if not base_url:
         raise HTTPException(status_code=400, detail="AI Base URL 未配置，请先到设置页配置")
-    return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout)
+    return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout, db=db)
 
 
 def _load_json(value: str | None) -> list:
@@ -136,7 +136,13 @@ async def generate_flashcards_from_point(knowledge_point_id: int, db: Session = 
     )
 
     try:
-        raw = await ai_service.chat(GENERATE_FLASHCARDS_SYSTEM, user_prompt)
+        raw = await ai_service.chat(
+            GENERATE_FLASHCARDS_SYSTEM,
+            user_prompt,
+            operation="generate_flashcards",
+            related_type="knowledge_point",
+            related_id=kp.id,
+        )
         result = extract_json_from_text(raw)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

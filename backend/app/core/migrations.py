@@ -14,3 +14,13 @@ def ensure_runtime_columns(engine: Engine) -> None:
         for column, column_type in additions.items():
             if column not in review_columns:
                 conn.execute(text(f"ALTER TABLE review_tasks ADD COLUMN {column} {column_type}"))
+
+        ai_log_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(ai_call_logs)")).fetchall()}
+        ai_log_additions = {
+            "tokens_estimated": "BOOLEAN NOT NULL DEFAULT 0",
+            "input_price_per_1m": "FLOAT NOT NULL DEFAULT 0",
+            "output_price_per_1m": "FLOAT NOT NULL DEFAULT 0",
+        }
+        for column, column_type in ai_log_additions.items():
+            if ai_log_columns and column not in ai_log_columns:
+                conn.execute(text(f"ALTER TABLE ai_call_logs ADD COLUMN {column} {column_type}"))
