@@ -10,6 +10,7 @@ import {
   type KnowledgeBaseCreate,
   type KnowledgeBaseUpdate,
 } from '../api/knowledgeBase'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const dialogVisible = ref(false)
@@ -51,8 +52,8 @@ async function handleSubmit() {
     }
     dialogVisible.value = false
     await fetchList()
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '操作失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '操作失败'))
   }
 }
 
@@ -66,9 +67,9 @@ async function handleDelete(kb: KnowledgeBase) {
     await deleteKnowledgeBase(kb.id)
     ElMessage.success('知识库已删除')
     await fetchList()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.response?.data?.detail || '删除失败')
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除失败'))
     }
   }
 }

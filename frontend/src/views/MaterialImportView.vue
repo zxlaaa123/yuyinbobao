@@ -3,6 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createMaterial, getKnowledgeBasesForSelect, importAndExtract } from '../api/material'
 import type { KnowledgeBase, ExtractResult } from '../api/material'
+import { getErrorMessage } from '../utils/error'
 
 const form = reactive({
   knowledge_base_id: undefined as number | undefined,
@@ -55,8 +56,8 @@ async function handleSave() {
     })
     ElMessage.success('资料保存成功')
     resetForm()
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '保存失败，请重试')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '保存失败，请重试'))
   } finally {
     saving.value = false
   }
@@ -78,8 +79,8 @@ async function handleSaveAndExtract() {
     extractResult.value = result
     const splitInfo = result.split_used ? `（分 ${result.segment_count} 段处理）` : ''
     ElMessage.success(`成功提取 ${result.created_count} 个知识点${splitInfo}`)
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || 'AI 提取失败，请重试')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, 'AI 提取失败，请重试'))
   } finally {
     extracting.value = false
   }

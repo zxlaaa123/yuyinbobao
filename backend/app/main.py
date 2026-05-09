@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from .core.paths import DATA_DIR, AUDIO_DIR, UPLOAD_DIR, VECTOR_STORE_DIR
+from .core.paths import DATA_DIR, AUDIO_DIR, UPLOAD_DIR, VECTOR_STORE_DIR, BACKUP_DIR
 from .core.database import engine, Base
+from .core.errors import error_response, normalize_validation_errors
 from . import models
 from .api import api_router
 
@@ -10,6 +12,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 VECTOR_STORE_DIR.mkdir(parents=True, exist_ok=True)
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI()
 
@@ -28,6 +31,21 @@ app.include_router(api_router)
 
 # 挂载静态文件目录
 app.mount("/audio", StaticFiles(directory=str(AUDIO_DIR)), name="audio")
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return error_response(exc.status_code, exc.detail)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return error_response(422, normalize_validation_errors(exc.errors()), code="VALIDATION_ERROR")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    return error_response(500, "服务器内部错误，请稍后重试", code="INTERNAL_ERROR")
 
 
 @app.on_event("startup")

@@ -1,3 +1,5 @@
 export { checkHealth } from './health'
 export { getKnowledgeBases, getKnowledgeBase, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase } from './knowledgeBase'
 export type { KnowledgeBase, KnowledgeBaseCreate, KnowledgeBaseUpdate } from './knowledgeBase'
+export { getBackups, createBackup, restoreBackup, deleteBackup } from './backup'
+export type { BackupRecord } from './backup'

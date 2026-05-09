@@ -5,6 +5,7 @@ import { getAudioFiles, deleteAudioFile } from '../api/audio'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import type { AudioFile } from '../api/audio'
 import type { KnowledgeBase } from '../api/material'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const audioFiles = ref<AudioFile[]>([])
 const knowledgeBases = ref<KnowledgeBase[]>([])
@@ -57,9 +58,9 @@ async function handleDelete(audio: AudioFile) {
     await deleteAudioFile(audio.id)
     audioFiles.value = audioFiles.value.filter((a) => a.id !== audio.id)
     ElMessage.success('音频已删除')
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.response?.data?.detail || '删除失败')
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除失败'))
     }
   }
 }

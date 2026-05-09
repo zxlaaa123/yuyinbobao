@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import { getSettings, saveSettings, testAiConnection, testTtsConnection } from '../api/setting'
+import { createBackup, deleteBackup, getBackups, restoreBackup, type BackupRecord } from '../api/backup'
 import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from '../utils/theme'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const form = reactive({
   AI_PROVIDER: '',
@@ -27,6 +30,10 @@ const testingTts = ref(false)
 const aiTestResult = ref<{ success: boolean; message: string } | null>(null)
 const ttsTestResult = ref<{ success: boolean; message: string } | null>(null)
 const selectedTheme = ref<ThemeName>(getStoredTheme())
+const backups = ref<BackupRecord[]>([])
+const backupsLoading = ref(false)
+const backupCreating = ref(false)
+const backupNote = ref('')
 
 async function fetchSettings() {
   try {
@@ -34,6 +41,17 @@ async function fetchSettings() {
     Object.assign(form, data)
   } catch {
     ElMessage.error('加载设置失败')
+  }
+}
+
+async function fetchBackups() {
+  backupsLoading.value = true
+  try {
+    backups.value = await getBackups()
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载备份列表失败'))
+  } finally {
+    backupsLoading.value = false
   }
 }
 
@@ -52,8 +70,8 @@ async function handleSave() {
     }
     await saveSettings(payload)
     ElMessage.success('设置已保存')
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '保存失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '保存失败'))
   } finally {
     saving.value = false
   }
@@ -70,8 +88,8 @@ async function handleTestAi() {
     } else {
       ElMessage.warning(result.message)
     }
-  } catch (e: any) {
-    aiTestResult.value = { success: false, message: e.response?.data?.detail || '测试失败' }
+  } catch (e) {
+    aiTestResult.value = { success: false, message: getErrorMessage(e, '测试失败') }
     ElMessage.error(aiTestResult.value.message)
   } finally {
     testingAi.value = false
@@ -89,15 +107,76 @@ async function handleTestTts() {
     } else {
       ElMessage.warning(result.message)
     }
-  } catch (e: any) {
-    ttsTestResult.value = { success: false, message: e.response?.data?.detail || '测试失败' }
+  } catch (e) {
+    ttsTestResult.value = { success: false, message: getErrorMessage(e, '测试失败') }
     ElMessage.error(ttsTestResult.value.message)
   } finally {
     testingTts.value = false
   }
 }
 
-onMounted(fetchSettings)
+async function handleCreateBackup() {
+  backupCreating.value = true
+  try {
+    await createBackup(backupNote.value.trim() || undefined)
+    backupNote.value = ''
+    ElMessage.success('备份已创建')
+    await fetchBackups()
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '创建备份失败'))
+  } finally {
+    backupCreating.value = false
+  }
+}
+
+async function handleRestoreBackup(item: BackupRecord) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要恢复备份「${item.filename}」吗？系统会先自动备份当前数据，恢复后建议重启后端。`,
+      '恢复备份确认',
+      { type: 'warning', confirmButtonText: '恢复', cancelButtonText: '取消' },
+    )
+    const result = await restoreBackup(item.id)
+    ElMessage.success(result.message || '备份已恢复')
+    await fetchBackups()
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '恢复备份失败'))
+    }
+  }
+}
+
+async function handleDeleteBackup(item: BackupRecord) {
+  try {
+    await ElMessageBox.confirm(`确定要删除备份「${item.filename}」吗？`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await deleteBackup(item.id)
+    ElMessage.success('备份已删除')
+    await fetchBackups()
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除备份失败'))
+    }
+  }
+}
+
+function formatFileSize(size: number): string {
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleString()
+}
+
+onMounted(() => {
+  fetchSettings()
+  fetchBackups()
+})
 
 function handleThemeChange(value: ThemeName) {
   selectedTheme.value = value
@@ -136,6 +215,35 @@ function handleThemeChange(value: ThemeName) {
             </div>
           </button>
         </div>
+      </div>
+
+      <div class="settings-card backup-card">
+        <div class="card-title">
+          <h3>本地备份与恢复</h3>
+          <p>备份当前 SQLite 数据库，恢复前会自动保存一份当前数据。</p>
+        </div>
+        <div class="backup-create">
+          <el-input v-model="backupNote" placeholder="备份备注（可选）" clearable />
+          <el-button type="primary" :loading="backupCreating" @click="handleCreateBackup">创建备份</el-button>
+        </div>
+        <el-table v-loading="backupsLoading" :data="backups" empty-text="暂无备份" size="small">
+          <el-table-column prop="filename" label="文件" min-width="180" />
+          <el-table-column label="大小" width="90">
+            <template #default="{ row }">{{ formatFileSize(row.file_size) }}</template>
+          </el-table-column>
+          <el-table-column label="类型" width="80">
+            <template #default="{ row }">{{ row.trigger_type === 'auto' ? '自动' : '手动' }}</template>
+          </el-table-column>
+          <el-table-column label="时间" min-width="160">
+            <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="handleRestoreBackup(row)">恢复</el-button>
+              <el-button link type="danger" @click="handleDeleteBackup(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
       </div>
 
       <!-- AI 模型设置 -->
@@ -293,6 +401,16 @@ function handleThemeChange(value: ThemeName) {
   grid-column: 1 / -1;
 }
 
+.backup-card {
+  grid-column: 1 / -1;
+}
+
+.backup-create {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+}
+
 .theme-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -401,6 +519,10 @@ function handleThemeChange(value: ThemeName) {
   }
 
   .theme-list {
+    grid-template-columns: 1fr;
+  }
+
+  .backup-create {
     grid-template-columns: 1fr;
   }
 }

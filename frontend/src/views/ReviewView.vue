@@ -11,6 +11,7 @@ import {
 import { generateDailyReviewAudio } from '../api/audio'
 import type { ReviewTask } from '../api/review'
 import { useRouter } from 'vue-router'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const router = useRouter()
 const tasks = ref<ReviewTask[]>([])
@@ -49,8 +50,8 @@ async function handleGenerate() {
       ElMessage.info(result.message || '没有新任务生成')
     }
     await fetchTasks()
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '生成失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '生成失败'))
   } finally {
     generateLoading.value = false
   }
@@ -61,8 +62,8 @@ async function handleGenerateAudio() {
   try {
     const result = await generateDailyReviewAudio()
     ElMessage.success(`每日复习音频生成成功（${result.knowledge_point_count} 个知识点）`)
-  } catch (e: any) {
-    const msg = e.response?.data?.detail || '生成失败'
+  } catch (e) {
+    const msg = getErrorMessage(e, '生成失败')
     ElMessage.error(msg)
   } finally {
     audioLoading.value = false
@@ -74,8 +75,8 @@ async function handleComplete(task: ReviewTask, quality: string) {
     await completeReviewTask(task.id, quality)
     ElMessage.success('已完成')
     await fetchTasks()
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '操作失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '操作失败'))
   }
 }
 
@@ -84,8 +85,8 @@ async function handleSnooze(task: ReviewTask) {
     await snoozeReviewTask(task.id, 24)
     ElMessage.success('已推迟 24 小时')
     await fetchTasks()
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '操作失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '操作失败'))
   }
 }
 
@@ -99,9 +100,9 @@ async function handleDelete(task: ReviewTask) {
     await deleteReviewTask(task.id)
     ElMessage.success('任务已删除')
     await fetchTasks()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.response?.data?.detail || '删除失败')
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除失败'))
     }
   }
 }

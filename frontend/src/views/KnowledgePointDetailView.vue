@@ -9,6 +9,7 @@ import type { GeneratedQuestion } from '../api/question'
 import { generateAudio, getAudioFiles } from '../api/audio'
 import { getFlashcards, createFlashcard, generateFlashcards } from '../api/flashcard'
 import type { Flashcard } from '../api/flashcard'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 function getAudioUrl(fileUrl: string | null): string {
   if (!fileUrl) return ''
@@ -58,8 +59,8 @@ async function handleGenerateAudio() {
     const result = await generateAudio(kp.value.id)
     audioFileUrl.value = result.file_url
     ElMessage.success('音频生成成功')
-  } catch (e: any) {
-    audioError.value = e.response?.data?.detail || '音频生成失败'
+  } catch (e) {
+    audioError.value = getErrorMessage(e, '音频生成失败')
     ElMessage.error(audioError.value || '音频生成失败')
   } finally {
     audioLoading.value = false
@@ -71,8 +72,8 @@ async function loadFlashcards() {
   flashcardsLoading.value = true
   try {
     flashcards.value = await getFlashcards(kp.value.id)
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '加载闪卡失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '加载闪卡失败'))
   } finally {
     flashcardsLoading.value = false
   }
@@ -99,8 +100,8 @@ async function handleCreateFlashcard() {
     flashcardForm.back = ''
     flashcardForm.flashcard_type = 'basic'
     ElMessage.success('闪卡已创建')
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '创建闪卡失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '创建闪卡失败'))
   }
 }
 
@@ -111,8 +112,8 @@ async function handleGenerateFlashcards() {
     const result = await generateFlashcards(kp.value.id)
     flashcards.value = await getFlashcards(kp.value.id)
     ElMessage.success(`已生成 ${result.created_count} 张闪卡`)
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || 'AI 生成闪卡失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, 'AI 生成闪卡失败'))
   } finally {
     flashcardsGenerating.value = false
   }
@@ -167,8 +168,8 @@ async function handleSave() {
     kp.value = updated
     editing.value = false
     ElMessage.success('知识点已更新')
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '保存失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '保存失败'))
   }
 }
 
@@ -183,9 +184,9 @@ async function handleDelete() {
     await deleteKnowledgePoint(kp.value.id)
     ElMessage.success('知识点已删除')
     router.push('/knowledge-points')
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.response?.data?.detail || '删除失败')
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除失败'))
     }
   }
 }
@@ -219,8 +220,8 @@ async function handleGenerateQuestions() {
     const result = await generateQuestions(kp.value.id, genTypes.value, genCount.value)
     genResult.value = result
     ElMessage.success(`已生成 ${result.created_count} 道题`)
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '生成失败，请重试')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '生成失败，请重试'))
   } finally {
     genLoading.value = false
   }

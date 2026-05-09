@@ -5,6 +5,7 @@ import { getPracticeQuestions, submitAnswer } from '../api/practice'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import type { PracticeQuestion } from '../api/practice'
 import type { KnowledgeBase } from '../api/material'
+import { getErrorMessage } from '../utils/error'
 
 type Phase = 'setup' | 'practicing' | 'finished'
 
@@ -80,8 +81,8 @@ async function handleSubmit() {
     } else {
       wrongCount.value++
     }
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '提交失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '提交失败'))
   }
 }
 

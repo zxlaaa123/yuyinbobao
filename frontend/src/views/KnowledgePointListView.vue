@@ -8,6 +8,7 @@ import { generateBatchAudio } from '../api/audio'
 import { exportKnowledgePointsCsv } from '../api/export'
 import type { KnowledgePoint } from '../api/knowledgePoint'
 import type { KnowledgeBase } from '../api/material'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const router = useRouter()
 const knowledgePoints = ref<KnowledgePoint[]>([])
@@ -65,9 +66,9 @@ async function handleDelete(kp: KnowledgePoint) {
     ElMessage.success('知识点已删除')
     selectedIds.value = selectedIds.value.filter((id) => id !== kp.id)
     await fetchData()
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.response?.data?.detail || '删除失败')
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除失败'))
     }
   }
 }
@@ -90,8 +91,8 @@ async function handleBatchGenerate() {
     const result = await generateBatchAudio(selectedIds.value)
     ElMessage.success(`合集音频生成成功（${result.knowledge_point_count} 个知识点）`)
     selectedIds.value = []
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '批量生成音频失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '批量生成音频失败'))
   } finally {
     batchLoading.value = false
   }

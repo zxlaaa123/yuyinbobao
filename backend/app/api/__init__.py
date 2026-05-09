@@ -14,6 +14,7 @@ from .routes.stats import router as stats_router
 from .routes.review import router as review_router
 from .routes.flashcards import router as flashcards_router
 from .routes.export import router as export_router
+from .routes.backups import router as backups_router
 
 api_router = APIRouter()
 api_router.include_router(knowledge_bases_router)
@@ -31,3 +32,4 @@ api_router.include_router(stats_router)
 api_router.include_router(review_router)
 api_router.include_router(flashcards_router)
 api_router.include_router(export_router)
+api_router.include_router(backups_router)

@@ -7,6 +7,7 @@ import { generateWrongQuestionAudio } from '../api/audio'
 import { exportWrongQuestionsCsv } from '../api/export'
 import type { WrongQuestion } from '../api/wrongQuestion'
 import type { KnowledgeBase } from '../api/material'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const wrongQuestions = ref<WrongQuestion[]>([])
 const knowledgeBases = ref<KnowledgeBase[]>([])
@@ -54,8 +55,8 @@ async function handleBatchAudio() {
     const result = await generateWrongQuestionAudio(selectedIds.value)
     ElMessage.success(`错题音频生成成功（${result.knowledge_point_count} 个知识点）`)
     selectedIds.value = []
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '生成失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '生成失败'))
   } finally {
     batchLoading.value = false
   }
@@ -66,8 +67,8 @@ async function handleMarkMastered(wq: WrongQuestion) {
     await markMastered(wq.id)
     wq.is_mastered = true
     ElMessage.success('已标记为掌握')
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '操作失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '操作失败'))
   }
 }
 
@@ -76,8 +77,8 @@ async function handleUnmarkMastered(wq: WrongQuestion) {
     await unmarkMastered(wq.id)
     wq.is_mastered = false
     ElMessage.success('已取消掌握标记')
-  } catch (e: any) {
-    ElMessage.error(e.response?.data?.detail || '操作失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '操作失败'))
   }
 }
 
@@ -92,9 +93,9 @@ async function handleDelete(wq: WrongQuestion) {
     wrongQuestions.value = wrongQuestions.value.filter((w) => w.id !== wq.id)
     selectedIds.value = selectedIds.value.filter((id) => id !== wq.id)
     ElMessage.success('错题记录已删除')
-  } catch (e: any) {
-    if (e !== 'cancel') {
-      ElMessage.error(e.response?.data?.detail || '删除失败')
+  } catch (e) {
+    if (!isUserCanceled(e)) {
+      ElMessage.error(getErrorMessage(e, '删除失败'))
     }
   }
 }
