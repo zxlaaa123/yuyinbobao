@@ -78,8 +78,10 @@ async def test_tts_connection(db: Session = Depends(get_db)):
     if provider == "xiaomi":
         api_key = settings.get("XIAOMI_TTS_API_KEY", "")
         base_url = settings.get("XIAOMI_TTS_BASE_URL", "")
+        model = settings.get("XIAOMI_TTS_MODEL", "mimo-v2.5-tts")
         voice = settings.get("XIAOMI_TTS_VOICE", "mimo_default")
-        audio_format = settings.get("XIAOMI_TTS_FORMAT", "mp3")
+        audio_format = settings.get("XIAOMI_TTS_FORMAT", "wav")
+        style_prompt = settings.get("XIAOMI_TTS_STYLE_PROMPT", "用清晰、自然的语调朗读以下知识点内容，语速适中，发音标准。")
         if not api_key:
             return {"success": False, "message": "小米 TTS API Key 未配置，请先到设置页配置"}
         if not base_url:
@@ -91,9 +93,9 @@ async def test_tts_connection(db: Session = Depends(get_db)):
             "Content-Type": "application/json",
         }
         payload = {
-            "model": "mimo-v2.5-tts",
+            "model": model,
             "messages": [
-                {"role": "user", "content": "用清晰自然的语调朗读。"},
+                {"role": "user", "content": style_prompt},
                 {"role": "assistant", "content": "测试音频。"}
             ],
             "audio": {"format": audio_format, "voice": voice},

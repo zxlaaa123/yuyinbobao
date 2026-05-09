@@ -114,9 +114,9 @@ def build_text_from_knowledge_point(kp) -> str:
 
 
 def normalize_audio_format(audio_format: str | None) -> str:
-    normalized = (audio_format or "mp3").strip().lower()
-    if normalized not in {"mp3", "wav", "pcm16"}:
-        return "mp3"
+    normalized = (audio_format or "wav").strip().lower()
+    if normalized not in {"wav", "pcm16"}:
+        return "wav"
     return normalized
 
 
@@ -125,14 +125,16 @@ async def synthesize_audio(
     provider: str = "mock",
     api_key: str = "",
     base_url: str = "",
+    model: str = "mimo-v2.5-tts",
     voice: str = "mimo_default",
     audio_format: str = "mp3",
+    style_prompt: str = "",
 ) -> bytes:
     audio_format = normalize_audio_format(audio_format)
     if provider == "mock":
         return _mock_synthesize(text, audio_format)
     elif provider == "xiaomi":
-        return await _xiaomi_synthesize(text, api_key, base_url, voice, audio_format)
+        return await _xiaomi_synthesize(text, api_key, base_url, model, voice, audio_format, style_prompt)
     else:
         raise ValueError(f"不支持的 TTS Provider: {provider}")
 
@@ -167,7 +169,15 @@ def _mock_wav(text: str) -> bytes:
     return buffer.getvalue()
 
 
-async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str, audio_format: str) -> bytes:
+async def _xiaomi_synthesize(
+    text: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    voice: str,
+    audio_format: str,
+    style_prompt: str,
+) -> bytes:
     """小米 TTS Provider"""
     if not api_key:
         raise ValueError("小米 TTS API Key 未配置")
@@ -180,11 +190,11 @@ async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str,
         "Content-Type": "application/json",
     }
     payload = {
-        "model": "mimo-v2.5-tts",
+        "model": model,
         "messages": [
             {
                 "role": "user",
-                "content": "用清晰、自然的语调朗读以下知识点内容，语速适中，发音标准。"
+                "content": style_prompt
             },
             {
                 "role": "assistant",
@@ -198,11 +208,36 @@ async def _xiaomi_synthesize(text: str, api_key: str, base_url: str, voice: str,
         "stream": False
     }
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        detail = _extract_xiaomi_error(exc.response)
+        raise ValueError(f"小米 TTS 接口调用失败：HTTP {exc.response.status_code} {detail}") from exc
+    except httpx.TimeoutException as exc:
+        raise ValueError("小米 TTS 接口调用超时") from exc
 
     # 解析音频数据
-    audio_data = data["choices"][0]["message"]["audio"]["data"]
-    return base64.b64decode(audio_data)
+    try:
+        audio_data = data["choices"][0]["message"]["audio"]["data"]
+        return base64.b64decode(audio_data)
+    except Exception as exc:
+        raise ValueError("小米 TTS 返回音频数据格式异常") from exc
+
+
+def _extract_xiaomi_error(resp: httpx.Response) -> str:
+    try:
+        data = resp.json()
+        if isinstance(data, dict):
+            error = data.get("error") or data.get("message") or data.get("detail")
+            if isinstance(error, dict):
+                return str(error.get("message") or error)
+            if error:
+                return str(error)
+    except Exception:
+        pass
+    return resp.text[:300]
+    model = (model or "mimo-v2.5-tts").strip()
+    style_prompt = (style_prompt or "用清晰、自然的语调朗读以下知识点内容，语速适中，发音标准。").strip()

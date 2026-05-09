@@ -42,6 +42,11 @@ AI_MAX_SEGMENTS = int(os.getenv("AI_MAX_SEGMENTS", "5"))
 TTS_PROVIDER = os.getenv("TTS_PROVIDER", "mock")
 XIAOMI_TTS_API_KEY = os.getenv("XIAOMI_TTS_API_KEY", "")
 XIAOMI_TTS_BASE_URL = os.getenv("XIAOMI_TTS_BASE_URL", "")
+XIAOMI_TTS_MODEL = os.getenv("XIAOMI_TTS_MODEL", "mimo-v2.5-tts")
 XIAOMI_TTS_VOICE = os.getenv("XIAOMI_TTS_VOICE", "mimo_default")
-XIAOMI_TTS_FORMAT = os.getenv("XIAOMI_TTS_FORMAT", "mp3")
+XIAOMI_TTS_FORMAT = os.getenv("XIAOMI_TTS_FORMAT", "wav")
 XIAOMI_TTS_SPEED = float(os.getenv("XIAOMI_TTS_SPEED", "1.0"))
+XIAOMI_TTS_STYLE_PROMPT = os.getenv(
+    "XIAOMI_TTS_STYLE_PROMPT",
+    "用清晰、自然的语调朗读以下知识点内容，语速适中，发音标准。",
+)

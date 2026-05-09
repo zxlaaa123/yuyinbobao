@@ -21,9 +21,11 @@ const form = reactive({
   TTS_PROVIDER: '',
   XIAOMI_TTS_API_KEY: '',
   XIAOMI_TTS_BASE_URL: '',
+  XIAOMI_TTS_MODEL: '',
   XIAOMI_TTS_VOICE: '',
   XIAOMI_TTS_FORMAT: '',
   XIAOMI_TTS_SPEED: 1.0,
+  XIAOMI_TTS_STYLE_PROMPT: '',
 })
 
 const saving = ref(false)
@@ -347,6 +349,10 @@ function handleThemeChange(value: ThemeName) {
           <el-form-item label="小米 TTS Base URL">
             <el-input v-model="form.XIAOMI_TTS_BASE_URL" placeholder="https://token-plan-cn.xiaomimimo.com/v1" />
           </el-form-item>
+          <el-form-item label="TTS Model">
+            <el-input v-model="form.XIAOMI_TTS_MODEL" placeholder="mimo-v2.5-tts" />
+            <div class="field-tip">默认使用 mimo-v2.5-tts；先不启用音色设计和音色复刻流程</div>
+          </el-form-item>
           <el-form-item label="音色">
             <el-select v-model="form.XIAOMI_TTS_VOICE" placeholder="选择音色" style="width: 100%">
               <el-option label="MiMo-默认" value="mimo_default" />
@@ -365,9 +371,21 @@ function handleThemeChange(value: ThemeName) {
               <el-option label="WAV" value="wav" />
               <el-option label="PCM16" value="pcm16" />
             </el-select>
+            <div class="field-tip">网页播放建议 WAV；PCM16 更适合流式或后处理，浏览器可能不能直接播放</div>
           </el-form-item>
           <el-form-item label="语速">
             <el-input-number v-model="form.XIAOMI_TTS_SPEED" :min="0.5" :max="2" :step="0.1" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="播报风格指令">
+            <el-input
+              v-model="form.XIAOMI_TTS_STYLE_PROMPT"
+              type="textarea"
+              :rows="4"
+              maxlength="500"
+              show-word-limit
+              placeholder="例如：用温和清晰的老师语气讲解，语速稍慢，重点概念前后适当停顿，语调自然，不要夸张。"
+            />
+            <div class="field-tip">只写声音风格、语速、情绪、角色和场景，不要把学习正文写在这里</div>
           </el-form-item>
         </el-form>
         <div class="card-actions">

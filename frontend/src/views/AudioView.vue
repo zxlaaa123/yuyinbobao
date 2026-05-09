@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getAudioFiles, deleteAudioFile } from '../api/audio'
+import { getAudioFiles, deleteAudioFile, retryAudioFile } from '../api/audio'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import type { AudioFile } from '../api/audio'
 import type { KnowledgeBase } from '../api/material'
@@ -13,6 +13,8 @@ const loading = ref(false)
 const filterKB = ref<number | undefined>()
 const filterStatus = ref<string | undefined>()
 const filterType = ref<string | undefined>()
+const filterFormat = ref<string | undefined>()
+const retryingId = ref<number | null>(null)
 
 function getAudioUrl(fileUrl: string | null): string {
   if (!fileUrl) return ''
@@ -21,17 +23,7 @@ function getAudioUrl(fileUrl: string | null): string {
 }
 
 const filteredAudio = computed(() => {
-  let list = audioFiles.value
-  if (filterType.value === 'single') {
-    list = list.filter((a) => !a.title.startsWith('合集') && !a.title.startsWith('每日复习') && !a.title.startsWith('错题复习'))
-  } else if (filterType.value === 'collection') {
-    list = list.filter((a) => a.title.startsWith('合集'))
-  } else if (filterType.value === 'daily_review') {
-    list = list.filter((a) => a.title.startsWith('每日复习'))
-  } else if (filterType.value === 'wrong_question') {
-    list = list.filter((a) => a.title.startsWith('错题复习'))
-  }
-  return list
+  return audioFiles.value
 })
 
 async function fetchData() {
@@ -40,6 +32,8 @@ async function fetchData() {
     audioFiles.value = await getAudioFiles({
       knowledge_base_id: filterKB.value,
       status: filterStatus.value,
+      audio_type: filterType.value,
+      audio_format: filterFormat.value,
     })
   } catch {
     ElMessage.error('加载音频列表失败')
@@ -51,17 +45,31 @@ async function fetchData() {
 async function handleDelete(audio: AudioFile) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除音频「${audio.title}」吗？删除后不可恢复。`,
+      `确定要删除音频「${audio.title}」吗？将删除数据库记录，并尝试同步删除本地音频文件。此操作不可恢复。`,
       '删除确认',
       { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
     )
-    await deleteAudioFile(audio.id)
+    const result = await deleteAudioFile(audio.id)
     audioFiles.value = audioFiles.value.filter((a) => a.id !== audio.id)
-    ElMessage.success('音频已删除')
+    ElMessage.success(result.message || '音频已删除')
   } catch (e) {
     if (!isUserCanceled(e)) {
       ElMessage.error(getErrorMessage(e, '删除失败'))
     }
+  }
+}
+
+async function handleRetry(audio: AudioFile) {
+  retryingId.value = audio.id
+  try {
+    await retryAudioFile(audio.id)
+    ElMessage.success('音频已重新生成')
+    await fetchData()
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '重新生成失败'))
+    await fetchData()
+  } finally {
+    retryingId.value = null
   }
 }
 
@@ -71,6 +79,22 @@ function statusLabel(status: string) {
 
 function statusClass(status: string) {
   return { success: 'ok', failed: 'error', pending: 'loading' }[status] || ''
+}
+
+function typeLabel(type: string) {
+  return {
+    single: '单个知识点',
+    collection: '合集音频',
+    daily_review: '每日复习',
+    wrong_question: '错题复习',
+  }[type] || type
+}
+
+function formatFileSize(size: number | null): string {
+  if (!size) return '-'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 onMounted(async () => {
@@ -104,6 +128,10 @@ onMounted(async () => {
         <el-option label="每日复习" value="daily_review" />
         <el-option label="错题复习" value="wrong_question" />
       </el-select>
+      <el-select v-model="filterFormat" placeholder="全部格式" clearable style="width: 140px" @change="fetchData">
+        <el-option label="WAV" value="wav" />
+        <el-option label="PCM16" value="pcm16" />
+      </el-select>
     </div>
 
     <!-- 空状态 -->
@@ -120,7 +148,14 @@ onMounted(async () => {
             <span class="status-badge" :class="statusClass(audio.status)">
               {{ statusLabel(audio.status) }}
             </span>
+            <span class="type-badge">{{ typeLabel(audio.audio_type) }}</span>
+            <span class="type-badge">{{ (audio.audio_format || '-').toUpperCase() }}</span>
             <span class="time">{{ audio.created_at }}</span>
+          </div>
+          <div class="audio-detail">
+            <span>Provider：{{ audio.provider || '-' }}</span>
+            <span>音色：{{ audio.voice || '-' }}</span>
+            <span>大小：{{ formatFileSize(audio.file_size) }}</span>
           </div>
           <div v-if="audio.error_message" class="error-msg">
             错误：{{ audio.error_message }}
@@ -137,6 +172,15 @@ onMounted(async () => {
         </div>
 
         <div class="audio-actions">
+          <el-button
+            v-if="audio.status === 'failed'"
+            size="small"
+            type="primary"
+            :loading="retryingId === audio.id"
+            @click="handleRetry(audio)"
+          >
+            重新生成
+          </el-button>
           <el-button size="small" type="danger" @click="handleDelete(audio)">删除</el-button>
         </div>
       </div>
@@ -210,6 +254,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .status-badge {
@@ -235,6 +280,24 @@ onMounted(async () => {
   color: var(--warning-text);
 }
 
+.type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 12px;
+  background: var(--panel-strong);
+  color: var(--muted);
+}
+
+.audio-detail {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .time {
   font-size: 12px;
   color: var(--muted);
@@ -257,6 +320,9 @@ onMounted(async () => {
 
 .audio-actions {
   flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 700px) {

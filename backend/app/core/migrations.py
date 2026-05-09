@@ -24,3 +24,19 @@ def ensure_runtime_columns(engine: Engine) -> None:
         for column, column_type in ai_log_additions.items():
             if ai_log_columns and column not in ai_log_columns:
                 conn.execute(text(f"ALTER TABLE ai_call_logs ADD COLUMN {column} {column_type}"))
+
+        audio_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(audio_files)")).fetchall()}
+        audio_additions = {
+            "audio_type": "VARCHAR(50) NOT NULL DEFAULT 'single'",
+            "provider": "VARCHAR(50)",
+            "voice": "VARCHAR(100)",
+            "audio_format": "VARCHAR(20)",
+            "file_size": "INTEGER",
+        }
+        for column, column_type in audio_additions.items():
+            if audio_columns and column not in audio_columns:
+                conn.execute(text(f"ALTER TABLE audio_files ADD COLUMN {column} {column_type}"))
+        if audio_columns:
+            conn.execute(text("UPDATE audio_files SET audio_type = 'collection' WHERE audio_type = 'single' AND title LIKE '合集%'"))
+            conn.execute(text("UPDATE audio_files SET audio_type = 'daily_review' WHERE audio_type = 'single' AND title LIKE '每日复习%'"))
+            conn.execute(text("UPDATE audio_files SET audio_type = 'wrong_question' WHERE audio_type = 'single' AND title LIKE '错题复习%'"))
