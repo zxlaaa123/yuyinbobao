@@ -26,6 +26,39 @@ export interface GenerateResult {
   total_pending?: number
 }
 
+export interface TodayReviewItem {
+  knowledge_point_id: number
+  knowledge_base_id: number
+  title: string
+  summary: string
+  review_status: string
+  mastery_level: number
+  review_count: number
+  correct_streak: number
+  wrong_streak: number
+  last_reviewed_at: string | null
+  next_review_at: string | null
+  is_overdue: boolean
+}
+
+export interface TodayReviewOverview {
+  due_count: number
+  overdue_count: number
+  weak_count: number
+  items: TodayReviewItem[]
+}
+
+export function getTodayReviewOverview(params?: {
+  knowledge_base_id?: number
+  limit?: number
+}) {
+  const qs = new URLSearchParams()
+  if (params?.knowledge_base_id) qs.set('knowledge_base_id', String(params.knowledge_base_id))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  return request.get(`/api/review/today${suffix}`) as Promise<TodayReviewOverview>
+}
+
 export function getReviewTasks(params?: {
   status?: string
   knowledge_base_id?: number

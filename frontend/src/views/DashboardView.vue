@@ -6,6 +6,8 @@ import type { DashboardSummary } from '../api/dashboard'
 import { getStatsOverview, getKnowledgeBaseStats, getStatsTrends } from '../api/stats'
 import type { StatsOverview, KnowledgeBaseStats, TrendItem } from '../api/stats'
 import type { StudySession } from '../api/studySession'
+import { getTodayReviewOverview } from '../api/review'
+import type { TodayReviewOverview } from '../api/review'
 
 const router = useRouter()
 const summary = ref<DashboardSummary | null>(null)
@@ -18,6 +20,8 @@ const trends = ref<TrendItem[]>([])
 const trendsLoading = ref(true)
 const recentSessions = ref<StudySession[]>([])
 const sessionsLoading = ref(true)
+const reviewOverview = ref<TodayReviewOverview | null>(null)
+const reviewLoading = ref(true)
 
 const stats = [
   { key: 'knowledge_base_count', label: '知识库', icon: '📚', color: 0 },
@@ -85,6 +89,16 @@ async function fetchRecentSessions() {
   }
 }
 
+async function fetchReviewOverview() {
+  try {
+    reviewOverview.value = await getTodayReviewOverview({ limit: 5 })
+  } catch {
+    reviewOverview.value = null
+  } finally {
+    reviewLoading.value = false
+  }
+}
+
 function goTo(path: string) {
   router.push(path)
 }
@@ -113,6 +127,7 @@ onMounted(() => {
   fetchKbStats()
   fetchTrends()
   fetchRecentSessions()
+  fetchReviewOverview()
 })
 </script>
 
@@ -125,6 +140,7 @@ onMounted(() => {
       <div class="hero-actions">
         <el-button type="primary" @click="goTo('/materials/import')">开始导入资料</el-button>
         <el-button @click="goTo('/practice')">进入刷题练习</el-button>
+        <el-button @click="goTo('/review')">开始今日复习</el-button>
       </div>
     </div>
 
@@ -185,6 +201,50 @@ onMounted(() => {
       </div>
       <div v-else-if="!v2Stats && !v2Loading" class="v2-empty">
         暂无统计数据，开始刷题后这里会显示学习进度
+      </div>
+    </div>
+
+    <!-- V4 今日复习概览 -->
+    <div class="v2-stats">
+      <div class="section-header">
+        <h3>🗓️ 今日复习概览</h3>
+        <span v-if="reviewLoading" class="loading-text">加载中...</span>
+      </div>
+      <div v-if="reviewOverview && !reviewLoading" class="v2-grid review-grid">
+        <div class="v2-card">
+          <div class="v2-label">今日待复习</div>
+          <div class="v2-value">{{ reviewOverview.due_count }}</div>
+        </div>
+        <div class="v2-card">
+          <div class="v2-label">逾期复习</div>
+          <div class="v2-value accent-red">{{ reviewOverview.overdue_count }}</div>
+        </div>
+        <div class="v2-card">
+          <div class="v2-label">薄弱知识点</div>
+          <div class="v2-value">{{ reviewOverview.weak_count }}</div>
+        </div>
+        <div class="v2-card review-action-card" @click="goTo('/review')" style="cursor: pointer">
+          <div class="v2-label">复习入口</div>
+          <div class="v2-value accent-green">开始</div>
+          <div class="v2-sub">进入复习计划页</div>
+        </div>
+      </div>
+      <div v-if="reviewOverview && !reviewLoading && reviewOverview.items.length > 0" class="review-list">
+        <div v-for="item in reviewOverview.items" :key="item.knowledge_point_id" class="review-item">
+          <div class="review-item-main">
+            <div class="review-item-title">{{ item.title }}</div>
+            <div class="review-item-summary">{{ item.summary || '暂无摘要' }}</div>
+          </div>
+          <div class="review-item-meta">
+            <el-tag size="small" :type="item.is_overdue ? 'danger' : 'success'">
+              {{ item.is_overdue ? '逾期' : '今日' }}
+            </el-tag>
+            <span>掌握度 {{ item.mastery_level }}%</span>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="!reviewLoading" class="v2-empty">
+        今日暂无待复习知识点
       </div>
     </div>
 
@@ -648,6 +708,59 @@ onMounted(() => {
 .session-metrics strong {
   font-size: 20px;
   color: var(--text);
+}
+
+.review-grid {
+  margin-bottom: 14px;
+}
+
+.review-action-card {
+  border-style: dashed;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.review-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--dashboard-panel-alt);
+}
+
+.review-item-main {
+  min-width: 0;
+}
+
+.review-item-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.review-item-summary {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.review-item-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 @media (max-width: 900px) {
