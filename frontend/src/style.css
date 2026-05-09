@@ -323,10 +323,6 @@ body::before {
     width: 100% !important;
   }
 
-  .el-table {
-    min-width: 640px;
-  }
-
   .card-grid {
     grid-template-columns: 1fr !important;
   }

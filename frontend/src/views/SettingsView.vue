@@ -400,6 +400,7 @@ function handleThemeChange(value: ThemeName) {
 .page {
   padding: 24px 30px 42px;
   max-width: 900px;
+  min-width: 0;
 }
 
 .header {
@@ -424,6 +425,7 @@ function handleThemeChange(value: ThemeName) {
 }
 
 .settings-card {
+  min-width: 0;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -562,16 +564,36 @@ function handleThemeChange(value: ThemeName) {
 }
 
 @media (max-width: 768px) {
+  .page {
+    max-width: none;
+    width: 100%;
+  }
+
   .settings-grid {
     grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .settings-card {
+    padding: 18px;
   }
 
   .theme-list {
     grid-template-columns: 1fr;
   }
 
+  .theme-option,
+  .theme-meta {
+    min-width: 0;
+    width: 100%;
+  }
+
   .backup-create {
     grid-template-columns: 1fr;
+  }
+
+  .backup-card {
+    overflow-x: auto;
   }
 }
 </style>

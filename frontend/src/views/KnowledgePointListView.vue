@@ -187,7 +187,7 @@ onMounted(fetchData)
     />
 
     <!-- 表格列表 -->
-    <div v-else>
+    <div v-else class="table-scroll">
       <el-table
         :data="filteredList"
         @selection-change="handleSelectionChange"
@@ -260,6 +260,11 @@ onMounted(fetchData)
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .batch-bar {
