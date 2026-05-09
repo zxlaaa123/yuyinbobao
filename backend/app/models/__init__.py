@@ -11,6 +11,8 @@ from .flashcard import Flashcard
 from .backup_record import BackupRecord
 from .study_session import StudySession
 from .ai_call_log import AICallLog
+from .practice_session import PracticeSession
+from .practice_session_item import PracticeSessionItem
 
 __all__ = [
     "KnowledgeBase",
@@ -26,4 +28,6 @@ __all__ = [
     "BackupRecord",
     "StudySession",
     "AICallLog",
+    "PracticeSession",
+    "PracticeSessionItem",
 ]

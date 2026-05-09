@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getPracticeQuestions, submitAnswer } from '../api/practice'
 import { createStudySession, finishStudySession } from '../api/studySession'
+import { createPracticeSession } from '../api/practiceSession'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import type { PracticeQuestion } from '../api/practice'
 import type { StudySession } from '../api/studySession'
@@ -24,6 +25,15 @@ const correctCount = ref(0)
 const wrongCount = ref(0)
 const sessionId = ref<number | null>(null)
 const finishedSession = ref<StudySession | null>(null)
+const sessionStartedAt = ref<Date | null>(null)
+const savedPracticeSessionId = ref<number | null>(null)
+const practiceItems = ref<Array<{
+  question_id: number
+  knowledge_point_id?: number
+  user_answer?: string
+  is_correct: boolean
+  duration_seconds: number
+}>>([])
 
 // 设置
 const selKB = ref<number | undefined>()
@@ -71,6 +81,9 @@ async function startPractice() {
     selectedAnswer.value = ''
     selectedAnswers.value = []
     textAnswer.value = ''
+    sessionStartedAt.value = new Date()
+    savedPracticeSessionId.value = null
+    practiceItems.value = []
     answered.value = false
     answerResult.value = null
     correctCount.value = 0
@@ -148,6 +161,22 @@ function isWrongSelectedOption(key: string) {
   return selectedAnswer.value === key && !isCorrectOption(key)
 }
 
+function upsertPracticeItem(question: PracticeQuestion, userAnswer: string, isCorrect: boolean) {
+  const payload = {
+    question_id: question.id,
+    knowledge_point_id: question.knowledge_point_id,
+    user_answer: userAnswer,
+    is_correct: isCorrect,
+    duration_seconds: 0,
+  }
+  const idx = practiceItems.value.findIndex((item) => item.question_id === question.id)
+  if (idx >= 0) {
+    practiceItems.value[idx] = payload
+  } else {
+    practiceItems.value.push(payload)
+  }
+}
+
 async function handleSubmit() {
   const answer = currentUserAnswer()
   if (!answer) {
@@ -157,6 +186,7 @@ async function handleSubmit() {
   if (!currentQuestion.value) return
   try {
     const result = await submitAnswer(currentQuestion.value.id, answer)
+    upsertPracticeItem(currentQuestion.value, answer, result.is_correct)
     answerResult.value = result
     answered.value = true
     if (result.is_correct) {
@@ -170,17 +200,39 @@ async function handleSubmit() {
 }
 
 async function finishCurrentSession() {
-  if (!sessionId.value || finishedSession.value) {
+  const startedAt = sessionStartedAt.value || new Date()
+  const endedAt = new Date()
+  const durationSeconds = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000))
+
+  if (sessionId.value && !finishedSession.value) {
+    try {
+      finishedSession.value = await finishStudySession(sessionId.value, {
+        total_count: totalQuestions.value,
+        correct_count: correctCount.value,
+      })
+    } catch (e) {
+      ElMessage.error(getErrorMessage(e, '保存练习记录失败'))
+    }
+  }
+
+  if (savedPracticeSessionId.value || practiceItems.value.length === 0) {
     return
   }
 
   try {
-    finishedSession.value = await finishStudySession(sessionId.value, {
-      total_count: totalQuestions.value,
-      correct_count: correctCount.value,
+    const title = `练习会话 ${new Date().toLocaleString()}`
+    const session = await createPracticeSession({
+      mode: 'normal',
+      title,
+      knowledge_base_id: selKB.value,
+      items: practiceItems.value,
+      duration_seconds: durationSeconds,
+      started_at: startedAt.toISOString(),
+      ended_at: endedAt.toISOString(),
     })
+    savedPracticeSessionId.value = session.id
   } catch (e) {
-    ElMessage.error(getErrorMessage(e, '保存练习记录失败'))
+    ElMessage.error(getErrorMessage(e, '保存会话明细失败'))
   }
 }
 
@@ -211,6 +263,9 @@ function resetPractice() {
   wrongCount.value = 0
   sessionId.value = null
   finishedSession.value = null
+  sessionStartedAt.value = null
+  savedPracticeSessionId.value = null
+  practiceItems.value = []
 }
 
 onMounted(fetchKBs)
