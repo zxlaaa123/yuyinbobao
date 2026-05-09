@@ -20,6 +20,9 @@ def ensure_runtime_columns(engine: Engine) -> None:
             "tokens_estimated": "BOOLEAN NOT NULL DEFAULT 0",
             "input_price_per_1m": "FLOAT NOT NULL DEFAULT 0",
             "output_price_per_1m": "FLOAT NOT NULL DEFAULT 0",
+            "error_type": "VARCHAR(50)",
+            "json_parse_status": "VARCHAR(30) NOT NULL DEFAULT 'not_required'",
+            "http_status_code": "INTEGER",
         }
         for column, column_type in ai_log_additions.items():
             if ai_log_columns and column not in ai_log_columns:

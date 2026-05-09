@@ -1,9 +1,12 @@
+import time
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...services.setting_service import get_all_settings, update_settings, mask_secret, SENSITIVE_KEYS
 from ...services.ai_service import build_chat_completions_url
+from ...services.ai_log_service import create_ai_call_log_independent
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -34,11 +37,33 @@ async def test_ai_connection(db: Session = Depends(get_db)):
     api_key = settings.get("AI_API_KEY", "")
     base_url = settings.get("AI_BASE_URL", "")
     model = settings.get("AI_MODEL", "")
+    prompt_text = "settings:test-ai:hi"
+    started = time.perf_counter()
 
     if not api_key:
-        return {"success": False, "message": "AI API Key 未配置，请先到设置页配置"}
+        message = "AI API Key 未配置，请先到设置页配置"
+        _write_test_ai_log(
+            status="failed",
+            model=model,
+            base_url=base_url,
+            prompt_text=prompt_text,
+            error_type="validation_error",
+            error_message=message,
+            duration_ms=_elapsed_ms(started),
+        )
+        return {"success": False, "message": message}
     if not base_url:
-        return {"success": False, "message": "AI Base URL 未配置，请先到设置页配置"}
+        message = "AI Base URL 未配置，请先到设置页配置"
+        _write_test_ai_log(
+            status="failed",
+            model=model,
+            base_url=base_url,
+            prompt_text=prompt_text,
+            error_type="validation_error",
+            error_message=message,
+            duration_ms=_elapsed_ms(started),
+        )
+        return {"success": False, "message": message}
 
     # 发送最小请求测试连通性
     headers = {
@@ -58,13 +83,67 @@ async def test_ai_connection(db: Session = Depends(get_db)):
                 headers=headers,
             )
             if resp.status_code == 200:
+                usage = None
+                response_text = ""
+                try:
+                    data = resp.json()
+                    usage = data.get("usage") if isinstance(data, dict) else None
+                    if isinstance(data, dict):
+                        choices = data.get("choices") or []
+                        if choices and isinstance(choices[0], dict):
+                            message = choices[0].get("message") or {}
+                            response_text = str(message.get("content") or "")
+                except Exception:
+                    response_text = resp.text
+
+                _write_test_ai_log(
+                    status="success",
+                    model=model,
+                    base_url=base_url,
+                    prompt_text=prompt_text,
+                    response_text=response_text,
+                    usage=usage,
+                    duration_ms=_elapsed_ms(started),
+                )
                 return {"success": True, "message": "AI 连接正常", "model": model}
             else:
-                return {"success": False, "message": f"AI 连接失败：HTTP {resp.status_code}"}
+                message = f"AI 连接失败：HTTP {resp.status_code}"
+                _write_test_ai_log(
+                    status="failed",
+                    model=model,
+                    base_url=base_url,
+                    prompt_text=prompt_text,
+                    response_text=resp.text,
+                    error_type="http_error",
+                    http_status_code=resp.status_code,
+                    error_message=message,
+                    duration_ms=_elapsed_ms(started),
+                )
+                return {"success": False, "message": message}
     except httpx.TimeoutException:
-        return {"success": False, "message": "AI 连接超时，请检查网络或 Base URL"}
+        message = "AI 连接超时，请检查网络或 Base URL"
+        _write_test_ai_log(
+            status="failed",
+            model=model,
+            base_url=base_url,
+            prompt_text=prompt_text,
+            error_type="timeout",
+            error_message=message,
+            duration_ms=_elapsed_ms(started),
+        )
+        return {"success": False, "message": message}
     except Exception as e:
-        return {"success": False, "message": f"AI 连接失败：{str(e)}"}
+        message = f"AI 连接失败：{str(e)}"
+        _write_test_ai_log(
+            status="failed",
+            model=model,
+            base_url=base_url,
+            prompt_text=prompt_text,
+            error_type="unknown",
+            error_message=message,
+            duration_ms=_elapsed_ms(started),
+        )
+        return {"success": False, "message": message}
 
 
 @router.post("/test-tts")
@@ -120,3 +199,40 @@ async def test_tts_connection(db: Session = Depends(get_db)):
             return {"success": False, "message": f"小米 TTS 连接失败：{str(e)}"}
 
     return {"success": False, "message": f"不支持的 TTS Provider: {provider}"}
+
+
+def _elapsed_ms(started: float) -> int:
+    return int((time.perf_counter() - started) * 1000)
+
+
+def _write_test_ai_log(
+    *,
+    status: str,
+    model: str,
+    base_url: str,
+    prompt_text: str,
+    response_text: str = "",
+    usage: dict | None = None,
+    error_type: str | None = None,
+    error_message: str = "",
+    http_status_code: int | None = None,
+    duration_ms: int = 0,
+) -> None:
+    try:
+        create_ai_call_log_independent(
+            operation="test_ai_connection",
+            model=model or "",
+            base_url=base_url or "",
+            status=status,
+            prompt_text=prompt_text,
+            response_text=response_text,
+            usage=usage,
+            error_type=error_type,
+            error_message=error_message,
+            json_parse_status="not_required",
+            http_status_code=http_status_code,
+            duration_ms=duration_ms,
+            related_type="settings",
+        )
+    except Exception:
+        pass

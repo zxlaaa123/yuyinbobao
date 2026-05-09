@@ -74,13 +74,47 @@ class AIService:
                 usage = data.get("usage")
                 response_text = data["choices"][0]["message"]["content"]
                 return response_text
-        except Exception as exc:
+        except httpx.HTTPStatusError as exc:
             if log_call:
                 self._write_log(
                     operation=operation,
                     status="failed",
                     prompt_text=user_prompt,
                     response_text=response_text,
+                    error_type="http_error",
+                    http_status_code=exc.response.status_code if exc.response else None,
+                    error_message=str(exc),
+                    duration_ms=_elapsed_ms(started),
+                    usage=usage,
+                    related_type=related_type,
+                    related_id=related_id,
+                )
+            raise
+        except httpx.TimeoutException as exc:
+            if log_call:
+                self._write_log(
+                    operation=operation,
+                    status="failed",
+                    prompt_text=user_prompt,
+                    response_text=response_text,
+                    error_type="timeout",
+                    error_message=str(exc),
+                    duration_ms=_elapsed_ms(started),
+                    usage=usage,
+                    related_type=related_type,
+                    related_id=related_id,
+                )
+            raise
+        except Exception as exc:
+            error_type, http_status_code = _classify_error(exc)
+            if log_call:
+                self._write_log(
+                    operation=operation,
+                    status="failed",
+                    prompt_text=user_prompt,
+                    response_text=response_text,
+                    error_type=error_type,
+                    http_status_code=http_status_code,
                     error_message=str(exc),
                     duration_ms=_elapsed_ms(started),
                     usage=usage,
@@ -112,20 +146,24 @@ class AIService:
         user_prompt = build_extract_user_prompt(knowledge_base_name, material_title, material_content)
         started = time.perf_counter()
         raw = ""
+        json_parse_status = "not_required"
         try:
             raw = await self.chat(EXTRACT_KNOWLEDGE_POINTS_SYSTEM, user_prompt, log_call=False)
             result = extract_json_from_text(raw)
+            json_parse_status = "success"
         except ValueError as exc:
             # JSON 解析失败，尝试修复一次
             try:
                 fixed = try_fix_json(raw)
                 if fixed:
                     result = extract_json_from_text(fixed)
+                    json_parse_status = "fixed"
                 else:
                     # 用 AI 修复
                     fix_prompt = build_json_fix_prompt(raw[:3000])  # 限制长度
                     fixed_raw = await self.chat(JSON_FIX_SYSTEM, fix_prompt, operation="fix_json")
                     result = extract_json_from_text(fixed_raw)
+                    json_parse_status = "fixed"
             except Exception:
                 error = "AI 返回结果不是有效 JSON，修复失败，请重试"
                 self._write_log(
@@ -133,6 +171,8 @@ class AIService:
                     status="failed",
                     prompt_text=user_prompt,
                     response_text=raw,
+                    error_type="json_parse_error",
+                    json_parse_status="failed",
                     error_message=f"{error}；原始错误：{str(exc)}",
                     duration_ms=_elapsed_ms(started),
                     related_type=related_type,
@@ -140,12 +180,16 @@ class AIService:
                 )
                 raise ValueError(error)
         except Exception as exc:
+            error_type, http_status_code = _classify_error(exc)
             self._write_log(
                 operation="extract_knowledge_points",
                 status="failed",
                 prompt_text=user_prompt,
                 response_text=raw,
+                error_type=error_type,
+                http_status_code=http_status_code,
                 error_message=str(exc),
+                json_parse_status="not_required",
                 duration_ms=_elapsed_ms(started),
                 related_type=related_type,
                 related_id=related_id,
@@ -158,6 +202,8 @@ class AIService:
                 status="failed",
                 prompt_text=user_prompt,
                 response_text=raw,
+                error_type="validation_error",
+                json_parse_status=json_parse_status,
                 error_message=error,
                 duration_ms=_elapsed_ms(started),
                 related_type=related_type,
@@ -169,6 +215,7 @@ class AIService:
             status="success",
             prompt_text=user_prompt,
             response_text=raw,
+            json_parse_status=json_parse_status,
             duration_ms=_elapsed_ms(started),
             related_type=related_type,
             related_id=related_id,
@@ -202,20 +249,24 @@ class AIService:
         )
         started = time.perf_counter()
         raw = ""
+        json_parse_status = "not_required"
         try:
             raw = await self.chat(GENERATE_QUESTIONS_SYSTEM, user_prompt, log_call=False)
             result = extract_json_from_text(raw)
+            json_parse_status = "success"
         except ValueError as exc:
             # JSON 解析失败，尝试修复一次
             try:
                 fixed = try_fix_json(raw)
                 if fixed:
                     result = extract_json_from_text(fixed)
+                    json_parse_status = "fixed"
                 else:
                     # 用 AI 修复
                     fix_prompt = build_json_fix_prompt(raw[:3000])
                     fixed_raw = await self.chat(JSON_FIX_SYSTEM, fix_prompt, operation="fix_json")
                     result = extract_json_from_text(fixed_raw)
+                    json_parse_status = "fixed"
             except Exception:
                 error = "AI 返回结果不是有效 JSON，修复失败，请重试"
                 self._write_log(
@@ -223,6 +274,8 @@ class AIService:
                     status="failed",
                     prompt_text=user_prompt,
                     response_text=raw,
+                    error_type="json_parse_error",
+                    json_parse_status="failed",
                     error_message=f"{error}；原始错误：{str(exc)}",
                     duration_ms=_elapsed_ms(started),
                     related_type=related_type,
@@ -230,12 +283,16 @@ class AIService:
                 )
                 raise ValueError(error)
         except Exception as exc:
+            error_type, http_status_code = _classify_error(exc)
             self._write_log(
                 operation="generate_questions",
                 status="failed",
                 prompt_text=user_prompt,
                 response_text=raw,
+                error_type=error_type,
+                http_status_code=http_status_code,
                 error_message=str(exc),
+                json_parse_status="not_required",
                 duration_ms=_elapsed_ms(started),
                 related_type=related_type,
                 related_id=related_id,
@@ -248,6 +305,8 @@ class AIService:
                 status="failed",
                 prompt_text=user_prompt,
                 response_text=raw,
+                error_type="validation_error",
+                json_parse_status=json_parse_status,
                 error_message=error,
                 duration_ms=_elapsed_ms(started),
                 related_type=related_type,
@@ -259,6 +318,7 @@ class AIService:
             status="success",
             prompt_text=user_prompt,
             response_text=raw,
+            json_parse_status=json_parse_status,
             duration_ms=_elapsed_ms(started),
             related_type=related_type,
             related_id=related_id,
@@ -272,7 +332,10 @@ class AIService:
         status: str,
         prompt_text: str,
         response_text: str = "",
+        error_type: str | None = None,
         error_message: str = "",
+        json_parse_status: str = "not_required",
+        http_status_code: int | None = None,
         duration_ms: int = 0,
         usage: dict | None = None,
         related_type: str | None = None,
@@ -288,7 +351,10 @@ class AIService:
                 status=status,
                 prompt_text=prompt_text,
                 response_text=response_text,
+                error_type=error_type,
                 error_message=error_message,
+                json_parse_status=json_parse_status,
+                http_status_code=http_status_code,
                 duration_ms=duration_ms,
                 usage=usage,
                 related_type=related_type,
@@ -300,3 +366,13 @@ class AIService:
 
 def _elapsed_ms(started: float) -> int:
     return int((time.perf_counter() - started) * 1000)
+
+
+def _classify_error(exc: Exception) -> tuple[str, int | None]:
+    if isinstance(exc, httpx.TimeoutException):
+        return "timeout", None
+    if isinstance(exc, httpx.HTTPStatusError):
+        return "http_error", exc.response.status_code if exc.response else None
+    if isinstance(exc, ValueError):
+        return "validation_error", None
+    return "unknown", None

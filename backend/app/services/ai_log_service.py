@@ -1,3 +1,4 @@
+import re
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
@@ -37,6 +38,9 @@ def create_ai_call_log(
     usage: dict | None = None,
     related_type: str | None = None,
     related_id: int | None = None,
+    error_type: str | None = None,
+    json_parse_status: str = "not_required",
+    http_status_code: int | None = None,
 ) -> AICallLog:
     usage = usage or {}
     prompt_chars = len(prompt_text or "")
@@ -74,7 +78,10 @@ def create_ai_call_log(
         duration_ms=duration_ms,
         request_summary=_summary(prompt_text),
         response_summary=_summary(response_text),
+        error_type=_summary(error_type, 50) or None,
         error_message=_summary(error_message, 500),
+        json_parse_status=_summary(json_parse_status, 30) or "not_required",
+        http_status_code=http_status_code,
         related_type=related_type,
         related_id=related_id,
     )
@@ -97,7 +104,8 @@ def create_ai_call_log_independent(**kwargs) -> None:
 
 def _summary(text: str | None, limit: int = 500) -> str:
     cleaned = " ".join((text or "").split())
-    return cleaned[:limit]
+    redacted = _redact_secrets(cleaned)
+    return redacted[:limit]
 
 
 def _host_only(url: str) -> str:
@@ -117,3 +125,18 @@ def _to_float(value, fallback: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def _redact_secrets(text: str) -> str:
+    if not text:
+        return ""
+
+    redacted = text
+    patterns = [
+        (r'(?i)(authorization\s*[:=]\s*bearer\s+)([A-Za-z0-9\-._~+/=]+)', r"\1[REDACTED]"),
+        (r'(?i)\b(bearer)\s+([A-Za-z0-9\-._~+/=]{12,})', r"\1 [REDACTED]"),
+        (r'(?i)("?(?:api[_-]?key|apikey|secret|password|token|authorization)"?\s*[:=]\s*)("[^"]*"|[^",\s}]+)', r"\1[REDACTED]"),
+    ]
+    for pattern, replacement in patterns:
+        redacted = re.sub(pattern, replacement, redacted)
+    return redacted

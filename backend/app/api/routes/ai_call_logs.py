@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,8 @@ def list_ai_call_logs(
     page_size: int = 20,
     status: str | None = None,
     operation: str | None = None,
+    error_type: str | None = None,
+    json_parse_status: str | None = None,
     db: Session = Depends(get_db),
 ):
     page = max(page, 1)
@@ -23,6 +25,10 @@ def list_ai_call_logs(
         query = query.filter(AICallLog.status == status)
     if operation:
         query = query.filter(AICallLog.operation == operation)
+    if error_type:
+        query = query.filter(AICallLog.error_type == error_type)
+    if json_parse_status:
+        query = query.filter(AICallLog.json_parse_status == json_parse_status)
 
     total = query.count()
     logs = query.order_by(AICallLog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
@@ -48,6 +54,24 @@ def get_ai_call_log_summary(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/{log_id}")
+def get_ai_call_log(log_id: int, db: Session = Depends(get_db)):
+    item = db.query(AICallLog).filter(AICallLog.id == log_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="AI 日志不存在")
+    return _to_response(item)
+
+
+@router.delete("/{log_id}")
+def delete_ai_call_log(log_id: int, db: Session = Depends(get_db)):
+    item = db.query(AICallLog).filter(AICallLog.id == log_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="AI 日志不存在")
+    db.delete(item)
+    db.commit()
+    return {"success": True, "message": "AI 日志已删除"}
+
+
 def _to_response(item: AICallLog) -> dict:
     return {
         "id": item.id,
@@ -67,7 +91,10 @@ def _to_response(item: AICallLog) -> dict:
         "duration_ms": item.duration_ms,
         "request_summary": item.request_summary,
         "response_summary": item.response_summary,
+        "error_type": item.error_type,
         "error_message": item.error_message,
+        "json_parse_status": item.json_parse_status,
+        "http_status_code": item.http_status_code,
         "related_type": item.related_type,
         "related_id": item.related_id,
         "created_at": item.created_at,
