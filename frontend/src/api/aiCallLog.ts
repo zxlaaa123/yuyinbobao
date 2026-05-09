@@ -18,7 +18,10 @@ export interface AICallLog {
   duration_ms: number
   request_summary: string | null
   response_summary: string | null
+  error_type: string | null
   error_message: string | null
+  json_parse_status: string
+  http_status_code: number | null
   related_type: string | null
   related_id: number | null
   created_at: string
@@ -37,10 +40,20 @@ export function getAiCallLogs(params: {
   page_size?: number
   status?: string
   operation?: string
+  error_type?: string
+  json_parse_status?: string
 }) {
   return request.get('/api/ai-call-logs', { params }) as Promise<{ total: number; items: AICallLog[] }>
 }
 
 export function getAiCallLogSummary() {
   return request.get('/api/ai-call-logs/summary') as Promise<AICallLogSummary>
+}
+
+export function getAiCallLogDetail(logId: number) {
+  return request.get(`/api/ai-call-logs/${logId}`) as Promise<AICallLog>
+}
+
+export function deleteAiCallLog(logId: number) {
+  return request.delete(`/api/ai-call-logs/${logId}`) as Promise<{ success: boolean; message: string }>
 }
