@@ -1,4 +1,5 @@
 import request from './request'
+import type { StudySession } from './studySession'
 
 export interface DashboardSummary {
   knowledge_base_count: number
@@ -11,4 +12,8 @@ export interface DashboardSummary {
 
 export function getDashboardSummary() {
   return request.get('/api/dashboard/summary') as Promise<DashboardSummary>
+}
+
+export function getRecentStudySessions(limit = 5) {
+  return request.get(`/api/dashboard/recent-study-sessions?limit=${limit}`) as Promise<StudySession[]>
 }

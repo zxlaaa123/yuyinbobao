@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getDashboardSummary } from '../api/dashboard'
+import { getDashboardSummary, getRecentStudySessions } from '../api/dashboard'
 import type { DashboardSummary } from '../api/dashboard'
 import { getStatsOverview, getKnowledgeBaseStats, getStatsTrends } from '../api/stats'
 import type { StatsOverview, KnowledgeBaseStats, TrendItem } from '../api/stats'
+import type { StudySession } from '../api/studySession'
 
 const router = useRouter()
 const summary = ref<DashboardSummary | null>(null)
@@ -15,6 +16,8 @@ const kbStats = ref<KnowledgeBaseStats[]>([])
 const kbLoading = ref(true)
 const trends = ref<TrendItem[]>([])
 const trendsLoading = ref(true)
+const recentSessions = ref<StudySession[]>([])
+const sessionsLoading = ref(true)
 
 const stats = [
   { key: 'knowledge_base_count', label: '知识库', icon: '📚', color: 0 },
@@ -72,6 +75,16 @@ async function fetchTrends() {
   }
 }
 
+async function fetchRecentSessions() {
+  try {
+    recentSessions.value = await getRecentStudySessions(5)
+  } catch {
+    recentSessions.value = []
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
 function goTo(path: string) {
   router.push(path)
 }
@@ -81,11 +94,25 @@ function formatTrendDate(dateStr: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+function formatSessionTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hour = String(d.getHours()).padStart(2, '0')
+  const minute = String(d.getMinutes()).padStart(2, '0')
+  return `${month}/${day} ${hour}:${minute}`
+}
+
+function getSessionTitle(item: StudySession): string {
+  return item.knowledge_base_name || item.knowledge_point_title || '自由练习'
+}
+
 onMounted(() => {
   fetchSummary()
   fetchV2Stats()
   fetchKbStats()
   fetchTrends()
+  fetchRecentSessions()
 })
 </script>
 
@@ -200,6 +227,29 @@ onMounted(() => {
           <div class="trend-answers">{{ t.answers }}</div>
           <div class="trend-label">{{ formatTrendDate(t.date) }}</div>
         </div>
+      </div>
+    </div>
+
+    <!-- 最近学习记录 -->
+    <div class="v2-stats">
+      <div class="section-header">
+        <h3>最近学习记录</h3>
+        <span v-if="sessionsLoading" class="loading-text">加载中...</span>
+      </div>
+      <div v-if="!sessionsLoading && recentSessions.length > 0" class="session-list">
+        <div v-for="item in recentSessions" :key="item.id" class="session-card">
+          <div class="session-main">
+            <div class="session-title">{{ getSessionTitle(item) }}</div>
+            <div class="session-time">{{ formatSessionTime(item.started_at) }}</div>
+          </div>
+          <div class="session-metrics">
+            <span>{{ item.correct_count }}/{{ item.total_count }} 题</span>
+            <strong>{{ item.accuracy_rate }}%</strong>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="!sessionsLoading" class="v2-empty">
+        暂无学习记录，完成一次刷题后这里会显示最近会话
       </div>
     </div>
   </div>
@@ -556,6 +606,48 @@ onMounted(() => {
 .trend-label {
   font-size: 11px;
   color: var(--muted);
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.session-card {
+  background: var(--dashboard-panel-alt);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.session-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.session-time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.session-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.session-metrics strong {
+  font-size: 20px;
+  color: var(--text);
 }
 
 @media (max-width: 900px) {

@@ -9,6 +9,7 @@ from .app_setting import AppSetting
 from .review_task import ReviewTask
 from .flashcard import Flashcard
 from .backup_record import BackupRecord
+from .study_session import StudySession
 
 __all__ = [
     "KnowledgeBase",
@@ -22,4 +23,5 @@ __all__ = [
     "ReviewTask",
     "Flashcard",
     "BackupRecord",
+    "StudySession",
 ]

@@ -2,8 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getPracticeQuestions, submitAnswer } from '../api/practice'
+import { createStudySession, finishStudySession } from '../api/studySession'
 import { getKnowledgeBasesForSelect } from '../api/material'
 import type { PracticeQuestion } from '../api/practice'
+import type { StudySession } from '../api/studySession'
 import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage } from '../utils/error'
 
@@ -18,6 +20,8 @@ const answerResult = ref<any>(null)
 const phase = ref<Phase>('setup')
 const correctCount = ref(0)
 const wrongCount = ref(0)
+const sessionId = ref<number | null>(null)
+const finishedSession = ref<StudySession | null>(null)
 
 // 设置
 const selKB = ref<number | undefined>()
@@ -54,6 +58,13 @@ async function startPractice() {
       ElMessage.warning('该知识库下暂无题目，请先生成题目')
       return
     }
+    const session = await createStudySession({
+      knowledge_base_id: selKB.value,
+      knowledge_point_id: getSessionKnowledgePointId(),
+      total_count: questions.value.length,
+    })
+    sessionId.value = session.id
+    finishedSession.value = null
     currentIndex.value = 0
     selectedAnswer.value = ''
     answered.value = false
@@ -61,9 +72,14 @@ async function startPractice() {
     correctCount.value = 0
     wrongCount.value = 0
     phase.value = 'practicing'
-  } catch {
-    ElMessage.error('获取题目失败')
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '获取题目失败'))
   }
+}
+
+function getSessionKnowledgePointId(): number | undefined {
+  const ids = Array.from(new Set(questions.value.map((q) => q.knowledge_point_id).filter(Boolean)))
+  return ids.length === 1 ? ids[0] : undefined
 }
 
 async function handleSubmit() {
@@ -86,8 +102,24 @@ async function handleSubmit() {
   }
 }
 
-function nextQuestion() {
+async function finishCurrentSession() {
+  if (!sessionId.value || finishedSession.value) {
+    return
+  }
+
+  try {
+    finishedSession.value = await finishStudySession(sessionId.value, {
+      total_count: totalQuestions.value,
+      correct_count: correctCount.value,
+    })
+  } catch (e) {
+    ElMessage.error(getErrorMessage(e, '保存练习记录失败'))
+  }
+}
+
+async function nextQuestion() {
   if (currentIndex.value + 1 >= totalQuestions.value) {
+    await finishCurrentSession()
     phase.value = 'finished'
     return
   }
@@ -106,6 +138,8 @@ function resetPractice() {
   answerResult.value = null
   correctCount.value = 0
   wrongCount.value = 0
+  sessionId.value = null
+  finishedSession.value = null
 }
 
 onMounted(fetchKBs)
