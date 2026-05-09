@@ -1,6 +1,10 @@
 .env
 data/
 docs/
+docs2/
+docs3/
+plans/
+.playwright-mcp/
 backend/.venv/
 frontend/node_modules/
 frontend/dist/
