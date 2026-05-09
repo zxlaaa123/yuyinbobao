@@ -1,10 +1,58 @@
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
 from ..models.review_task import ReviewTask
 from ..models.knowledge_point import KnowledgePoint
 from ..models.wrong_question import WrongQuestion
 from ..models.question import Question
+
+
+REVIEW_BUCKETS = {"today", "overdue", "later", "completed"}
+
+
+def _review_bucket(task: ReviewTask, now: datetime | None = None) -> str:
+    if task.status == "completed":
+        return "completed"
+
+    now = now or datetime.utcnow()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+    scheduled_at = task.scheduled_at or now
+
+    if scheduled_at < today:
+        return "overdue"
+    if scheduled_at < tomorrow:
+        return "today"
+    return "later"
+
+
+def _next_interval_days(quality: str, review_count: int) -> int:
+    base = {"again": 1, "hard": 2, "good": 4, "easy": 7}.get(quality, 4)
+    if quality == "again":
+        return base
+    return base * max(review_count, 1)
+
+
+def _task_to_response(task: ReviewTask, kp: KnowledgePoint, now: datetime | None = None) -> dict:
+    return {
+        "id": task.id,
+        "knowledge_point_id": task.knowledge_point_id,
+        "kp_title": kp.title,
+        "kp_summary": kp.summary or "",
+        "source": task.source,
+        "status": task.status,
+        "review_bucket": _review_bucket(task, now),
+        "difficulty": task.difficulty,
+        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+        "last_reviewed_at": task.last_reviewed_at.isoformat() if task.last_reviewed_at else None,
+        "last_quality": task.last_quality,
+        "review_count": task.review_count,
+        "next_interval_days": task.next_interval_days,
+        "snooze_count": task.snooze_count,
+        "created_at": task.created_at.isoformat() if task.created_at else None,
+        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+    }
 
 
 def get_tasks(
@@ -17,31 +65,21 @@ def get_tasks(
     query = db.query(ReviewTask, KnowledgePoint).join(
         KnowledgePoint, ReviewTask.knowledge_point_id == KnowledgePoint.id
     )
-    if status:
+    if status and status not in REVIEW_BUCKETS:
         query = query.filter(ReviewTask.status == status)
+    elif status == "completed":
+        query = query.filter(ReviewTask.status == "completed")
+    elif status in {"today", "overdue", "later"}:
+        query = query.filter(ReviewTask.status == "pending")
     if knowledge_base_id:
         query = query.filter(KnowledgePoint.knowledge_base_id == knowledge_base_id)
-    rows = query.order_by(
-        ReviewTask.scheduled_at.asc().nullslast(), ReviewTask.created_at.asc()
-    ).offset(offset).limit(limit).all()
+    rows = query.order_by(ReviewTask.scheduled_at.asc().nullslast(), ReviewTask.created_at.asc()).all()
 
-    return [
-        {
-            "id": task.id,
-            "knowledge_point_id": task.knowledge_point_id,
-            "kp_title": kp.title,
-            "kp_summary": kp.summary or "",
-            "source": task.source,
-            "status": task.status,
-            "difficulty": task.difficulty,
-            "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
-            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-            "snooze_count": task.snooze_count,
-            "created_at": task.created_at.isoformat() if task.created_at else None,
-            "updated_at": task.updated_at.isoformat() if task.updated_at else None,
-        }
-        for task, kp in rows
-    ]
+    now = datetime.utcnow()
+    result = [_task_to_response(task, kp, now) for task, kp in rows]
+    if status in REVIEW_BUCKETS:
+        result = [item for item in result if item["review_bucket"] == status]
+    return result[offset: offset + limit]
 
 
 def get_task_by_id(db: Session, task_id: int) -> dict | None:
@@ -51,20 +89,7 @@ def get_task_by_id(db: Session, task_id: int) -> dict | None:
     if not row:
         return None
     task, kp = row
-    return {
-        "id": task.id,
-        "knowledge_point_id": task.knowledge_point_id,
-        "kp_title": kp.title,
-        "kp_summary": kp.summary or "",
-        "source": task.source,
-        "status": task.status,
-        "difficulty": task.difficulty,
-        "scheduled_at": task.scheduled_at.isoformat() if task.scheduled_at else None,
-        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-        "snooze_count": task.snooze_count,
-        "created_at": task.created_at.isoformat() if task.created_at else None,
-        "updated_at": task.updated_at.isoformat() if task.updated_at else None,
-    }
+    return _task_to_response(task, kp)
 
 
 def delete_task(db: Session, task_id: int) -> bool:
@@ -82,17 +107,15 @@ def complete_task(db: Session, task_id: int, quality: str = "good") -> ReviewTas
         raise ValueError("任务不存在")
 
     now = datetime.utcnow()
-    task.status = "completed"
+    next_review_count = task.review_count + 1
+    interval_days = _next_interval_days(quality, next_review_count)
+    task.status = "pending" if quality == "again" else "completed"
     task.completed_at = now
-
-    # 简单间隔：again=1天, hard=2天, good=3天, easy=5天
-    interval_map = {"again": 1, "hard": 2, "good": 3, "easy": 5}
-    days = interval_map.get(quality, 3)
-    task.scheduled_at = now + timedelta(days=days)
-
-    # 如果是 again，重置为 pending
-    if quality == "again":
-        task.status = "pending"
+    task.last_reviewed_at = now
+    task.last_quality = quality
+    task.review_count = next_review_count
+    task.next_interval_days = interval_days
+    task.scheduled_at = now + timedelta(days=interval_days)
 
     db.commit()
     db.refresh(task)
@@ -126,30 +149,27 @@ def generate_tasks(db: Session, max_tasks: int = 30) -> dict:
     created = 0
 
     # 1. 错题优先：有错题记录且未掌握的知识点
-    wrong_kp_ids = (
-        db.query(WrongQuestion.question_id)
+    wrong_question_ids = (
+        select(WrongQuestion.question_id)
         .filter(WrongQuestion.is_mastered == False)
-        .subquery()
     )
-    wrong_kp_from_questions = (
-        db.query(Question.knowledge_point_id)
-        .filter(Question.id.in_(wrong_kp_ids))
+    wrong_kp_ids = (
+        select(Question.knowledge_point_id)
+        .filter(Question.id.in_(wrong_question_ids))
         .distinct()
-        .subquery()
     )
 
     # 排除已有 pending 任务的知识点
     pending_kp_ids = (
-        db.query(ReviewTask.knowledge_point_id)
+        select(ReviewTask.knowledge_point_id)
         .filter(ReviewTask.status == "pending")
         .distinct()
-        .subquery()
     )
 
     wrong_kps = (
         db.query(KnowledgePoint)
         .filter(
-            KnowledgePoint.id.in_(wrong_kp_from_questions),
+            KnowledgePoint.id.in_(wrong_kp_ids),
             ~KnowledgePoint.id.in_(pending_kp_ids),
         )
         .limit(max_tasks)

@@ -7,9 +7,14 @@ export interface ReviewTask {
   kp_summary: string
   source: string
   status: string
+  review_bucket: 'today' | 'overdue' | 'later' | 'completed'
   difficulty: string
   scheduled_at: string | null
   completed_at: string | null
+  last_reviewed_at: string | null
+  last_quality: string | null
+  review_count: number
+  next_interval_days: number
   snooze_count: number
   created_at: string
   updated_at: string

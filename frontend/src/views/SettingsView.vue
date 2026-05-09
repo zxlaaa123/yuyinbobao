@@ -35,10 +35,31 @@ const backupsLoading = ref(false)
 const backupCreating = ref(false)
 const backupNote = ref('')
 
+const numericSettingDefaults: Record<string, number> = {
+  AI_TEMPERATURE: 0.3,
+  AI_TIMEOUT: 60,
+  AI_SEGMENT_SIZE: 3000,
+  AI_MAX_SEGMENTS: 5,
+  XIAOMI_TTS_SPEED: 1.0,
+}
+
+function toNumberSetting(value: unknown, fallback: number): number {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function normalizeNumericSettings(target: Record<string, any>) {
+  for (const [key, fallback] of Object.entries(numericSettingDefaults)) {
+    target[key] = toNumberSetting(target[key], fallback)
+  }
+}
+
 async function fetchSettings() {
   try {
     const data = await getSettings()
-    Object.assign(form, data)
+    const normalized = { ...data }
+    normalizeNumericSettings(normalized)
+    Object.assign(form, normalized)
   } catch {
     ElMessage.error('加载设置失败')
   }
@@ -62,6 +83,7 @@ async function handleSave() {
   try {
     // 敏感字段如果包含脱敏标记（****），不传该字段，避免覆盖真实 key
     const payload: Record<string, any> = { ...form }
+    normalizeNumericSettings(payload)
     for (const key of ['AI_API_KEY', 'XIAOMI_TTS_API_KEY']) {
       const val = payload[key]
       if (typeof val === 'string' && val.includes('****')) {

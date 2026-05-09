@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
@@ -248,10 +248,13 @@ async def _generate_collection_audio(db: Session, kps: list[KnowledgePoint], tit
 async def generate_daily_review(body: dict, db: Session = Depends(get_db)):
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # 查找今日 pending 复习任务
+    # 查找今日或逾期 pending 复习任务
     pending_tasks = (
         db.query(ReviewTask)
-        .filter(ReviewTask.status == "pending", ReviewTask.created_at >= today)
+        .filter(
+            ReviewTask.status == "pending",
+            (ReviewTask.scheduled_at == None) | (ReviewTask.scheduled_at < today + timedelta(days=1)),
+        )
         .all()
     )
 

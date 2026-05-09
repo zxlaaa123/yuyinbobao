@@ -18,14 +18,16 @@ const tasks = ref<ReviewTask[]>([])
 const loading = ref(false)
 const generateLoading = ref(false)
 const audioLoading = ref(false)
-const filterStatus = ref<string>('pending')
+const filterStatus = ref<string>('today')
 
 const filteredTasks = computed(() => {
   if (!filterStatus.value) return tasks.value
-  return tasks.value.filter((t) => t.status === filterStatus.value)
+  return tasks.value.filter((t) => t.review_bucket === filterStatus.value)
 })
 
-const pendingCount = computed(() => tasks.value.filter((t) => t.status === 'pending').length)
+const todayCount = computed(() => tasks.value.filter((t) => t.review_bucket === 'today').length)
+const overdueCount = computed(() => tasks.value.filter((t) => t.review_bucket === 'overdue').length)
+const laterCount = computed(() => tasks.value.filter((t) => t.review_bucket === 'later').length)
 const completedCount = computed(() => tasks.value.filter((t) => t.status === 'completed').length)
 const totalCount = computed(() => tasks.value.length)
 
@@ -125,6 +127,26 @@ function difficultyLabel(difficulty: string): string {
   return map[difficulty] || difficulty
 }
 
+function bucketLabel(bucket: string): string {
+  const map: Record<string, string> = {
+    today: '今日',
+    overdue: '逾期',
+    later: '稍后',
+    completed: '已完成',
+  }
+  return map[bucket] || bucket
+}
+
+function qualityLabel(quality: string | null): string {
+  const map: Record<string, string> = {
+    again: '需重学',
+    hard: '困难',
+    good: '良好',
+    easy: '轻松',
+  }
+  return quality ? map[quality] || quality : '-'
+}
+
 function formatDate(d: string | null): string {
   if (!d) return '-'
   return new Date(d).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -158,8 +180,16 @@ onMounted(fetchTasks)
     <!-- 统计摘要 -->
     <div class="summary-row">
       <div class="summary-card">
-        <span class="s-label">待复习</span>
-        <span class="s-value accent-red">{{ pendingCount }}</span>
+        <span class="s-label">今日</span>
+        <span class="s-value accent-green">{{ todayCount }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="s-label">逾期</span>
+        <span class="s-value accent-red">{{ overdueCount }}</span>
+      </div>
+      <div class="summary-card">
+        <span class="s-label">稍后</span>
+        <span class="s-value">{{ laterCount }}</span>
       </div>
       <div class="summary-card">
         <span class="s-label">已完成</span>
@@ -175,7 +205,9 @@ onMounted(fetchTasks)
     <div class="filters">
       <el-radio-group v-model="filterStatus">
         <el-radio-button value="">全部</el-radio-button>
-        <el-radio-button value="pending">待复习</el-radio-button>
+        <el-radio-button value="today">今日</el-radio-button>
+        <el-radio-button value="overdue">逾期</el-radio-button>
+        <el-radio-button value="later">稍后</el-radio-button>
         <el-radio-button value="completed">已完成</el-radio-button>
       </el-radio-group>
     </div>
@@ -183,7 +215,9 @@ onMounted(fetchTasks)
     <!-- 空状态 -->
     <div v-if="!loading && filteredTasks.length === 0" class="empty">
       <div class="empty-icon">📋</div>
-      <p v-if="filterStatus === 'pending'">暂无待复习任务，点击"生成今日复习"开始</p>
+      <p v-if="filterStatus === 'today'">暂无今日复习任务，点击"生成今日复习"开始</p>
+      <p v-else-if="filterStatus === 'overdue'">暂无逾期任务</p>
+      <p v-else-if="filterStatus === 'later'">暂无稍后复习任务</p>
       <p v-else-if="filterStatus === 'completed'">暂无已完成任务</p>
       <p v-else>暂无复习任务</p>
     </div>
@@ -204,13 +238,16 @@ onMounted(fetchTasks)
             <div class="task-badges">
               <span class="badge source">{{ sourceLabel(task.source) }}</span>
               <span class="badge difficulty" :class="task.difficulty">{{ difficultyLabel(task.difficulty) }}</span>
-              <span class="badge status" :class="task.status">{{ task.status === 'completed' ? '已完成' : '待复习' }}</span>
+              <span class="badge status" :class="task.review_bucket">{{ bucketLabel(task.review_bucket) }}</span>
             </div>
           </div>
           <div class="task-summary" v-if="task.kp_summary">{{ task.kp_summary }}</div>
           <div class="task-meta">
             <span>创建于 {{ formatDate(task.created_at) }}</span>
             <span v-if="task.scheduled_at"> · 计划 {{ formatDate(task.scheduled_at) }}</span>
+            <span v-if="task.last_quality"> · 上次 {{ qualityLabel(task.last_quality) }}</span>
+            <span v-if="task.review_count > 0"> · 已复习 {{ task.review_count }} 次</span>
+            <span v-if="task.next_interval_days > 0"> · 间隔 {{ task.next_interval_days }} 天</span>
             <span v-if="task.snooze_count > 0"> · 推迟 {{ task.snooze_count }} 次</span>
           </div>
         </div>
@@ -420,7 +457,17 @@ onMounted(fetchTasks)
   color: var(--danger-text);
 }
 
-.badge.status.pending {
+.badge.status.today {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.badge.status.overdue {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.badge.status.later {
   background: var(--warning-bg);
   color: var(--warning-text);
 }

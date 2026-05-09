@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from .core.paths import DATA_DIR, AUDIO_DIR, UPLOAD_DIR, VECTOR_STORE_DIR, BACKUP_DIR
 from .core.database import engine, Base
 from .core.errors import error_response, normalize_validation_errors
+from .core.migrations import ensure_runtime_columns
 from . import models
 from .api import api_router
 
@@ -51,6 +52,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    ensure_runtime_columns(engine)
 
 
 @app.get("/api/health")
