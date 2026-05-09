@@ -15,6 +15,27 @@ def ensure_runtime_columns(engine: Engine) -> None:
             if column not in review_columns:
                 conn.execute(text(f"ALTER TABLE review_tasks ADD COLUMN {column} {column_type}"))
 
+        kp_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(knowledge_points)")).fetchall()}
+        kp_additions = {
+            "mastery_level": "INTEGER NOT NULL DEFAULT 0",
+            "review_count": "INTEGER NOT NULL DEFAULT 0",
+            "correct_streak": "INTEGER NOT NULL DEFAULT 0",
+            "wrong_streak": "INTEGER NOT NULL DEFAULT 0",
+            "last_reviewed_at": "DATETIME",
+            "next_review_at": "DATETIME",
+            "review_status": "VARCHAR(20) NOT NULL DEFAULT 'new'",
+        }
+        for column, column_type in kp_additions.items():
+            if kp_columns and column not in kp_columns:
+                conn.execute(text(f"ALTER TABLE knowledge_points ADD COLUMN {column} {column_type}"))
+        if kp_columns:
+            conn.execute(text("UPDATE knowledge_points SET review_status = 'new' WHERE review_status IS NULL OR review_status = ''"))
+            conn.execute(text("UPDATE knowledge_points SET mastery_level = 0 WHERE mastery_level IS NULL"))
+            conn.execute(text("UPDATE knowledge_points SET review_count = 0 WHERE review_count IS NULL"))
+            conn.execute(text("UPDATE knowledge_points SET correct_streak = 0 WHERE correct_streak IS NULL"))
+            conn.execute(text("UPDATE knowledge_points SET wrong_streak = 0 WHERE wrong_streak IS NULL"))
+            conn.execute(text("UPDATE knowledge_points SET next_review_at = created_at WHERE next_review_at IS NULL"))
+
         ai_log_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(ai_call_logs)")).fetchall()}
         ai_log_additions = {
             "tokens_estimated": "BOOLEAN NOT NULL DEFAULT 0",
