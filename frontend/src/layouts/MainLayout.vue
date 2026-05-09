@@ -70,12 +70,17 @@ function resultTypeLabel(type: SearchResult['type']) {
   return type === 'knowledge_point' ? '知识点' : '资料'
 }
 
+function isMenuActive(key: string) {
+  return route.path === key || route.path.startsWith(`${key}/`)
+}
+
 const menuItems = [
   { key: '/dashboard', label: '首页', icon: '🏠' },
   { key: '/knowledge-bases', label: '知识库', icon: '📚' },
   { key: '/materials/import', label: '资料导入', icon: '📝' },
   { key: '/knowledge-points', label: '知识点', icon: '🧠' },
   { key: '/practice', label: '刷题练习', icon: '✅' },
+  { key: '/practice-sessions', label: '练习历史', icon: '📈' },
   { key: '/wrong-questions', label: '错题本', icon: '📌' },
   { key: '/review', label: '复习计划', icon: '🔄' },
   { key: '/audio', label: '音频播报', icon: '🎧' },
@@ -102,7 +107,7 @@ const menuItems = [
         <button
           v-for="item in menuItems"
           :key="item.key"
-          :class="{ active: route.path === item.key || (item.key !== '/dashboard' && route.path.startsWith(item.key)) }"
+          :class="{ active: isMenuActive(item.key) }"
           @click="router.push(item.key)"
         >
           <span class="icon">{{ item.icon }}</span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getPracticeQuestions, submitAnswer } from '../api/practice'
 import { createStudySession, finishStudySession } from '../api/studySession'
@@ -12,6 +13,7 @@ import { getErrorMessage } from '../utils/error'
 
 type Phase = 'setup' | 'practicing' | 'finished'
 
+const router = useRouter()
 const knowledgeBases = ref<KnowledgeBase[]>([])
 const questions = ref<PracticeQuestion[]>([])
 const currentIndex = ref(0)
@@ -25,6 +27,7 @@ const correctCount = ref(0)
 const wrongCount = ref(0)
 const sessionId = ref<number | null>(null)
 const finishedSession = ref<StudySession | null>(null)
+const savedPracticeSession = ref<import('../api/practiceSession').PracticeSession | null>(null)
 const sessionStartedAt = ref<Date | null>(null)
 const savedPracticeSessionId = ref<number | null>(null)
 const practiceItems = ref<Array<{
@@ -77,6 +80,7 @@ async function startPractice() {
     })
     sessionId.value = session.id
     finishedSession.value = null
+    savedPracticeSession.value = null
     currentIndex.value = 0
     selectedAnswer.value = ''
     selectedAnswers.value = []
@@ -108,6 +112,13 @@ function questionTypeLabel(type: string) {
     short_answer: '简答题',
   }
   return map[type] || type || '单选题'
+}
+
+function formatDuration(seconds?: number | null) {
+  const total = Math.max(0, seconds || 0)
+  const min = Math.floor(total / 60)
+  const sec = total % 60
+  return min > 0 ? `${min} 分 ${sec} 秒` : `${sec} 秒`
 }
 
 function isChoiceQuestion(question?: PracticeQuestion | null) {
@@ -231,6 +242,7 @@ async function finishCurrentSession() {
       ended_at: endedAt.toISOString(),
     })
     savedPracticeSessionId.value = session.id
+    savedPracticeSession.value = session
   } catch (e) {
     ElMessage.error(getErrorMessage(e, '保存会话明细失败'))
   }
@@ -263,6 +275,7 @@ function resetPractice() {
   wrongCount.value = 0
   sessionId.value = null
   finishedSession.value = null
+  savedPracticeSession.value = null
   sessionStartedAt.value = null
   savedPracticeSessionId.value = null
   practiceItems.value = []
@@ -303,6 +316,7 @@ onMounted(fetchKBs)
       </el-form>
       <div class="actions">
         <el-button type="primary" @click="startPractice">开始练习</el-button>
+        <el-button @click="router.push('/practice-sessions')">查看练习历史</el-button>
       </div>
     </div>
 
@@ -411,9 +425,31 @@ onMounted(fetchKBs)
           <b>{{ totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0 }}%</b>
           <span>正确率</span>
         </div>
+        <div class="stat-item">
+          <b>{{ formatDuration(savedPracticeSession?.duration_seconds || 0) }}</b>
+          <span>耗时</span>
+        </div>
+      </div>
+      <div v-if="savedPracticeSession" class="summary-panel">
+        <div class="summary-row">
+          <span>涉及知识点</span>
+          <strong>{{ savedPracticeSession.knowledge_point_ids.length }}</strong>
+        </div>
+        <div class="summary-row weak">
+          <span>薄弱知识点</span>
+          <strong>{{ savedPracticeSession.weak_knowledge_point_ids.length }}</strong>
+        </div>
+        <div class="summary-row wrong">
+          <span>错题</span>
+          <strong>{{ savedPracticeSession.wrong_question_ids.length }}</strong>
+        </div>
+        <p v-if="savedPracticeSession.suggestion" class="suggestion">{{ savedPracticeSession.suggestion }}</p>
       </div>
       <div class="actions">
         <el-button @click="resetPractice">再来一次</el-button>
+        <el-button v-if="savedPracticeSessionId" type="primary" @click="router.push(`/practice-sessions/${savedPracticeSessionId}`)">
+          查看本次详情
+        </el-button>
       </div>
     </div>
   </div>
@@ -625,6 +661,7 @@ onMounted(fetchKBs)
   justify-content: center;
   gap: 40px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
 }
 
 .stat-item {
@@ -653,5 +690,43 @@ onMounted(fetchKBs)
 
 .stat-item.rate b {
   color: var(--gold);
+}
+
+.summary-panel {
+  display: grid;
+  gap: 10px;
+  max-width: 460px;
+  margin: 0 auto 24px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  text-align: left;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.summary-row strong {
+  color: var(--text);
+}
+
+.summary-row.weak strong,
+.summary-row.wrong strong {
+  color: var(--danger);
+}
+
+.suggestion {
+  margin: 8px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 14px;
 }
 </style>

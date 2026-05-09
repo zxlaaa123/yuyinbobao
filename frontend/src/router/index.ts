@@ -5,6 +5,7 @@ import MaterialImportView from '../views/MaterialImportView.vue'
 import KnowledgePointListView from '../views/KnowledgePointListView.vue'
 import KnowledgePointDetailView from '../views/KnowledgePointDetailView.vue'
 import PracticeView from '../views/PracticeView.vue'
+import PracticeSessionsView from '../views/PracticeSessionsView.vue'
 import WrongQuestionView from '../views/WrongQuestionView.vue'
 import AudioView from '../views/AudioView.vue'
 import SettingsView from '../views/SettingsView.vue'
@@ -25,6 +26,8 @@ const router = createRouter({
         { path: 'knowledge-points', component: KnowledgePointListView },
         { path: 'knowledge-points/:id', component: KnowledgePointDetailView },
         { path: 'practice', component: PracticeView },
+        { path: 'practice-sessions', component: PracticeSessionsView },
+        { path: 'practice-sessions/:id', component: PracticeSessionsView },
         { path: 'wrong-questions', component: WrongQuestionView },
         { path: 'review', component: ReviewView },
         { path: 'audio', component: AudioView },
