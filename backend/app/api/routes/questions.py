@@ -10,16 +10,18 @@ router = APIRouter(prefix="/api/questions", tags=["questions"])
 
 
 def _to_response(q: Question) -> dict:
+    reference_answer = q.reference_answer if q.reference_answer else q.answer
     return {
         "id": q.id,
         "knowledge_base_id": q.knowledge_base_id,
         "knowledge_point_id": q.knowledge_point_id,
-        "question_type": q.question_type,
+        "question_type": q.question_type or "single_choice",
         "stem": q.stem,
         "options": json.loads(q.options) if q.options else [],
         "answer": q.answer,
+        "reference_answer": reference_answer,
         "analysis": q.analysis,
-        "difficulty": q.difficulty,
+        "difficulty": q.difficulty or "medium",
         "created_at": q.created_at,
         "updated_at": q.updated_at,
     }

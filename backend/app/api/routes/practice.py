@@ -31,10 +31,11 @@ def get_practice_questions(
     for q in questions:
         result.append({
             "id": q.id,
-            "question_type": q.question_type,
+            "question_type": q.question_type or "single_choice",
             "stem": q.stem,
             "options": json.loads(q.options) if q.options else [],
-            "difficulty": q.difficulty,
+            "difficulty": q.difficulty or "medium",
+            "reference_answer": q.reference_answer or q.answer,
             "knowledge_point_id": q.knowledge_point_id,
         })
     return result

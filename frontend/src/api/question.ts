@@ -8,6 +8,7 @@ export interface Question {
   stem: string
   options: { key: string; text: string }[]
   answer: string
+  reference_answer: string | null
   analysis: string | null
   difficulty: string
   created_at: string
@@ -43,6 +44,7 @@ export interface GeneratedQuestion {
   stem: string
   options: { key: string; text: string }[]
   answer: string
+  reference_answer: string | null
   analysis: string | null
   difficulty: string
 }

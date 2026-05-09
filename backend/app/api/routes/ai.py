@@ -238,6 +238,7 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
             stem=stem,
             options=json.dumps(options, ensure_ascii=False),
             answer=answer,
+            reference_answer=q.get("reference_answer") or answer,
             analysis=q.get("analysis", ""),
             difficulty=difficulty,
         )
@@ -263,6 +264,7 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
                 "stem": q.stem,
                 "options": json.loads(q.options) if q.options else [],
                 "answer": q.answer,
+                "reference_answer": q.reference_answer or q.answer,
                 "analysis": q.analysis,
                 "difficulty": q.difficulty,
             }

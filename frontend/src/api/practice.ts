@@ -6,7 +6,19 @@ export interface PracticeQuestion {
   stem: string
   options: { key: string; text: string }[]
   difficulty: string
+  reference_answer: string | null
   knowledge_point_id: number
+}
+
+export interface AnswerReviewState {
+  knowledge_point_id: number
+  review_status: string
+  mastery_level: number
+  review_count: number
+  correct_streak: number
+  wrong_streak: number
+  last_reviewed_at: string | null
+  next_review_at: string | null
 }
 
 export interface AnswerResult {
@@ -16,6 +28,7 @@ export interface AnswerResult {
   correct_answer: string
   analysis: string
   wrong_question_id: number | null
+  review?: AnswerReviewState | null
 }
 
 export function getPracticeQuestions(params?: {

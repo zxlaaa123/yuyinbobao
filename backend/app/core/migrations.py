@@ -4,6 +4,19 @@ from sqlalchemy.engine import Engine
 
 def ensure_runtime_columns(engine: Engine) -> None:
     with engine.begin() as conn:
+        question_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(questions)")).fetchall()}
+        question_additions = {
+            "question_type": "VARCHAR(50) NOT NULL DEFAULT 'single_choice'",
+            "difficulty": "VARCHAR(20) NOT NULL DEFAULT 'medium'",
+            "reference_answer": "TEXT",
+        }
+        for column, column_type in question_additions.items():
+            if question_columns and column not in question_columns:
+                conn.execute(text(f"ALTER TABLE questions ADD COLUMN {column} {column_type}"))
+        if question_columns:
+            conn.execute(text("UPDATE questions SET question_type = 'single_choice' WHERE question_type IS NULL OR question_type = ''"))
+            conn.execute(text("UPDATE questions SET difficulty = 'medium' WHERE difficulty IS NULL OR difficulty = ''"))
+
         review_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(review_tasks)")).fetchall()}
         additions = {
             "last_reviewed_at": "DATETIME",
