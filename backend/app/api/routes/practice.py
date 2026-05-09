@@ -5,6 +5,7 @@ from ...core.database import get_db
 from ...models.question import Question
 from ...models.answer_record import AnswerRecord
 from ...models.wrong_question import WrongQuestion
+from ...services.review_service import apply_answer_review_result
 
 router = APIRouter(prefix="/api/practice", tags=["practice"])
 
@@ -82,6 +83,8 @@ def submit_answer(body: dict, db: Session = Depends(get_db)):
         db.flush()
         wrong_question_id = wq.id
 
+    review = apply_answer_review_result(db, q.knowledge_point_id, is_correct)
+
     db.commit()
 
     return {
@@ -91,4 +94,5 @@ def submit_answer(body: dict, db: Session = Depends(get_db)):
         "correct_answer": q.answer,
         "analysis": q.analysis or "",
         "wrong_question_id": wrong_question_id,
+        "review": review,
     }

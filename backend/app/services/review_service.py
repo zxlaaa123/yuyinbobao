@@ -10,6 +10,51 @@ from ..models.question import Question
 REVIEW_BUCKETS = {"today", "overdue", "later", "completed"}
 
 
+def apply_answer_review_result(db: Session, knowledge_point_id: int, is_correct: bool) -> dict:
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == knowledge_point_id).first()
+    if not kp:
+        raise ValueError("知识点不存在")
+
+    now = datetime.utcnow()
+    kp.review_count = (kp.review_count or 0) + 1
+    kp.last_reviewed_at = now
+
+    if is_correct:
+        kp.correct_streak = (kp.correct_streak or 0) + 1
+        kp.wrong_streak = 0
+        kp.mastery_level = min((kp.mastery_level or 0) + 15, 100)
+
+        if kp.correct_streak >= 3 and kp.mastery_level >= 80:
+            kp.review_status = "mastered"
+            kp.next_review_at = now + timedelta(days=30)
+        elif kp.correct_streak >= 2:
+            kp.review_status = "review"
+            kp.next_review_at = now + timedelta(days=7)
+        else:
+            kp.review_status = "review"
+            kp.next_review_at = now + timedelta(days=3)
+    else:
+        kp.wrong_streak = (kp.wrong_streak or 0) + 1
+        kp.correct_streak = 0
+        kp.mastery_level = max((kp.mastery_level or 0) - 20, 0)
+        kp.review_status = "learning"
+        if kp.wrong_streak >= 2:
+            kp.next_review_at = now + timedelta(days=1)
+        else:
+            kp.next_review_at = now + timedelta(days=2)
+
+    return {
+        "knowledge_point_id": kp.id,
+        "review_status": kp.review_status,
+        "mastery_level": kp.mastery_level,
+        "review_count": kp.review_count,
+        "correct_streak": kp.correct_streak,
+        "wrong_streak": kp.wrong_streak,
+        "last_reviewed_at": kp.last_reviewed_at.isoformat() if kp.last_reviewed_at else None,
+        "next_review_at": kp.next_review_at.isoformat() if kp.next_review_at else None,
+    }
+
+
 def get_today_review_overview(db: Session, knowledge_base_id: int | None = None, limit: int = 100) -> dict:
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
