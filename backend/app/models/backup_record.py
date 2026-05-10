@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class BackupRecord(Base):
@@ -14,4 +14,4 @@ class BackupRecord(Base):
     trigger_type = Column(String(20), default="manual", nullable=False)
     note = Column(Text, nullable=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utc_now, index=True)

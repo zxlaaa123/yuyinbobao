@@ -1,4 +1,3 @@
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
@@ -6,6 +5,7 @@ from ...models.study_session import StudySession
 from ...models.knowledge_base import KnowledgeBase
 from ...models.knowledge_point import KnowledgePoint
 from ...schemas.study_session import StudySessionCreate, StudySessionFinish, StudySessionResponse
+from ...utils.time import utc_now
 
 router = APIRouter(prefix="/api/study-sessions", tags=["study-sessions"])
 
@@ -47,7 +47,7 @@ def finish_study_session(session_id: int, body: StudySessionFinish, db: Session 
     session.total_count = body.total_count
     session.correct_count = correct_count
     session.accuracy_rate = round(correct_count / body.total_count * 100, 1) if body.total_count else 0
-    session.ended_at = datetime.utcnow()
+    session.ended_at = utc_now()
 
     db.commit()
     db.refresh(session)

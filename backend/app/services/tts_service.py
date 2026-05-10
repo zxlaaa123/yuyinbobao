@@ -214,8 +214,7 @@ async def _xiaomi_synthesize(
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPStatusError as exc:
-        detail = _extract_xiaomi_error(exc.response)
-        raise ValueError(f"小米 TTS 接口调用失败：HTTP {exc.response.status_code} {detail}") from exc
+        raise ValueError(f"小米 TTS 接口调用失败：HTTP {exc.response.status_code}") from exc
     except httpx.TimeoutException as exc:
         raise ValueError("小米 TTS 接口调用超时") from exc
 
@@ -226,18 +225,3 @@ async def _xiaomi_synthesize(
     except Exception as exc:
         raise ValueError("小米 TTS 返回音频数据格式异常") from exc
 
-
-def _extract_xiaomi_error(resp: httpx.Response) -> str:
-    try:
-        data = resp.json()
-        if isinstance(data, dict):
-            error = data.get("error") or data.get("message") or data.get("detail")
-            if isinstance(error, dict):
-                return str(error.get("message") or error)
-            if error:
-                return str(error)
-    except Exception:
-        pass
-    return resp.text[:300]
-    model = (model or "mimo-v2.5-tts").strip()
-    style_prompt = (style_prompt or "用清晰、自然的语调朗读以下知识点内容，语速适中，发音标准。").strip()

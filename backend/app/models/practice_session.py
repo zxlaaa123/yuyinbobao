@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class PracticeSession(Base):
@@ -21,4 +21,4 @@ class PracticeSession(Base):
     suggestion = Column(Text, nullable=True)
     started_at = Column(DateTime, nullable=True, index=True)
     ended_at = Column(DateTime, nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)

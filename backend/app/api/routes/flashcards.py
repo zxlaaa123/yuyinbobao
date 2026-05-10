@@ -6,6 +6,7 @@ from ...models.knowledge_point import KnowledgePoint
 from ...schemas.flashcard import FlashcardCreate, FlashcardUpdate
 from ...services.ai_service import AIService
 from ...core.config import get_setting, AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_TEMPERATURE, AI_TIMEOUT
+from ...utils.json_helpers import load_json as _load_json
 from ...services.json_parser import extract_json_from_text
 
 router = APIRouter(prefix="/api/flashcards", tags=["flashcards"])
@@ -22,16 +23,6 @@ def _get_ai_service(db: Session) -> AIService:
     if not base_url:
         raise HTTPException(status_code=400, detail="AI Base URL 未配置，请先到设置页配置")
     return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout, db=db)
-
-
-def _load_json(value: str | None) -> list:
-    if not value:
-        return []
-    import json
-    try:
-        return json.loads(value)
-    except Exception:
-        return []
 
 
 def _to_response(fc: Flashcard) -> dict:
@@ -144,10 +135,10 @@ async def generate_flashcards_from_point(knowledge_point_id: int, db: Session = 
             related_id=kp.id,
         )
         result = extract_json_from_text(raw)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI 调用失败：{str(e)}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="AI JSON 解析失败，请稍后重试")
+    except Exception:
+        raise HTTPException(status_code=500, detail="AI 调用失败，请检查模型配置或稍后重试")
 
     raw_cards = result.get("flashcards", [])
     if not raw_cards:

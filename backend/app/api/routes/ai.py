@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-import json
 from ...core.database import get_db
 from ...core.config import get_setting, AI_API_KEY, AI_BASE_URL, AI_MODEL, AI_TEMPERATURE, AI_TIMEOUT, AI_SEGMENT_SIZE, AI_MAX_SEGMENTS
 from ...models.material import Material
@@ -13,6 +12,8 @@ from ...services.dedup_service import (
     normalize_stem,
     normalize_title,
 )
+from ...utils.json_helpers import dump_json as _dump_json
+from ...utils.json_helpers import load_json as _load_json
 from ...services.text_splitter import split_text
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
@@ -29,23 +30,6 @@ def _get_ai_service(db: Session) -> AIService:
     if not base_url:
         raise HTTPException(status_code=400, detail="AI Base URL 未配置，请先到设置页配置")
     return AIService(api_key=api_key, base_url=base_url, model=model, temperature=temperature, timeout=timeout, db=db)
-
-
-def _dump_json(value) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _load_json(value: str | None) -> list:
-    if not value:
-        return []
-    try:
-        return json.loads(value)
-    except Exception:
-        return []
 
 
 @router.post("/extract-points")
@@ -86,8 +70,8 @@ async def extract_points(body: dict, db: Session = Depends(get_db)):
             )
         except HTTPException:
             raise
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(e)}")
+        except Exception:
+            raise HTTPException(status_code=500, detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）")
 
         knowledge_points = result.get("knowledge_points", [])
 
@@ -170,8 +154,8 @@ async def generate_questions(body: dict, db: Session = Depends(get_db)):
         )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI 调用失败：{str(e)}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="AI 调用失败，请检查模型配置或稍后重试")
 
     raw_questions = result.get("questions", [])
     if not raw_questions:

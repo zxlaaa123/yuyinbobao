@@ -94,7 +94,7 @@ async def test_ai_connection(db: Session = Depends(get_db)):
                             message = choices[0].get("message") or {}
                             response_text = str(message.get("content") or "")
                 except Exception:
-                    response_text = resp.text
+                    response_text = "[AI 响应 JSON 解析失败，原始响应已脱敏]"
 
                 _write_test_ai_log(
                     status="success",
@@ -113,7 +113,7 @@ async def test_ai_connection(db: Session = Depends(get_db)):
                     model=model,
                     base_url=base_url,
                     prompt_text=prompt_text,
-                    response_text=resp.text,
+                    response_text="",
                     error_type="http_error",
                     http_status_code=resp.status_code,
                     error_message=message,
@@ -133,7 +133,7 @@ async def test_ai_connection(db: Session = Depends(get_db)):
         )
         return {"success": False, "message": message}
     except Exception as e:
-        message = f"AI 连接失败：{str(e)}"
+        message = "AI 连接失败，请检查模型配置或稍后重试"
         _write_test_ai_log(
             status="failed",
             model=model,
@@ -195,8 +195,8 @@ async def test_tts_connection(db: Session = Depends(get_db)):
                     return {"success": False, "message": f"小米 TTS 连接失败：HTTP {resp.status_code}"}
         except httpx.TimeoutException:
             return {"success": False, "message": "小米 TTS 连接超时，请检查网络或 Base URL"}
-        except Exception as e:
-            return {"success": False, "message": f"小米 TTS 连接失败：{str(e)}"}
+        except Exception:
+            return {"success": False, "message": "小米 TTS 连接失败，请检查配置或稍后重试"}
 
     return {"success": False, "message": f"不支持的 TTS Provider: {provider}"}
 

@@ -1,14 +1,10 @@
-import json
-import time
 from pathlib import Path
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from ...core.config import AI_MAX_SEGMENTS, AI_SEGMENT_SIZE, get_setting
+from ...core.config import AI_MAX_SEGMENTS, AI_SEGMENT_SIZE, MAX_UPLOAD_SIZE_BYTES, MAX_UPLOAD_SIZE_MB, get_setting
 from ...core.database import get_db
-from ...core.paths import UPLOAD_DIR
 from ...models.knowledge_base import KnowledgeBase
 from ...models.knowledge_point import KnowledgePoint
 from ...models.material import Material
@@ -19,8 +15,10 @@ from ...models.audio_file import AudioFile
 from ...schemas.material import MaterialCreate, MaterialUpdate
 from ...services.audio_service import delete_audio_file
 from ...services.dedup_service import build_existing_kp_title_set, normalize_title
+from ...utils.json_helpers import dump_json as _dump_json
+from ...utils.json_helpers import load_json as _load_json
 from ...services.text_splitter import split_text
-from .ai import _get_ai_service, _dump_json, _load_json
+from .ai import _get_ai_service
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
 
@@ -75,7 +73,9 @@ async def upload_text_material(file: UploadFile = File(...)):
     if suffix not in SUPPORTED_TEXT_SUFFIXES:
         raise HTTPException(status_code=400, detail="仅支持 TXT 或 Markdown 文件")
 
-    raw = await file.read()
+    raw = await file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail=f"上传文件不能超过 {MAX_UPLOAD_SIZE_MB}MB")
     if not raw:
         raise HTTPException(status_code=400, detail="上传文件内容为空")
 
@@ -91,18 +91,12 @@ async def upload_text_material(file: UploadFile = File(...)):
     if not content:
         raise HTTPException(status_code=400, detail="资料正文不能为空")
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    safe_stem = _safe_filename(Path(original_name).stem or "material")
-    saved_name = f"{safe_stem}_{int(time.time())}_{uuid4().hex[:8]}{suffix}"
-    saved_path = UPLOAD_DIR / saved_name
-    saved_path.write_bytes(raw)
-
     return {
         "title": Path(original_name).stem or "未命名资料",
         "content": content,
         "source": original_name,
         "file_name": original_name,
-        "saved_path": f"data/uploads/{saved_name}",
+        "saved_path": None,
         "content_length": len(content),
     }
 
@@ -164,10 +158,7 @@ async def import_and_extract(body: dict, db: Session = Depends(get_db)):
                 raise
             except Exception as exc:
                 print(f"[EXTRACT] segment {seg_idx + 1} failed: {exc}", flush=True)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）：{str(exc)}",
-                )
+                raise HTTPException(status_code=500, detail=f"AI 调用失败（第 {seg_idx + 1}/{segment_count} 段）")
 
             knowledge_points = result.get("knowledge_points", [])
             for kp in knowledge_points:
@@ -324,21 +315,6 @@ def _to_response(material: Material, kb_name: str) -> dict:
     }
 
 
-def _dump_json(value) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _load_json(value: str | None) -> list:
-    if not value:
-        return []
-    try:
-        return json.loads(value)
-    except Exception:
-        return []
 
 
 def _safe_filename(value: str) -> str:

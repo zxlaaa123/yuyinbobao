@@ -3,9 +3,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .core.paths import DATA_DIR, AUDIO_DIR, UPLOAD_DIR, VECTOR_STORE_DIR, BACKUP_DIR
+from .core.config import get_cors_origins
 from .core.database import engine, Base
 from .core.errors import error_response, normalize_validation_errors
 from .core.migrations import ensure_runtime_columns
+from .core.startup import ensure_runtime_environment
 from . import models
 from .api import api_router
 
@@ -19,10 +21,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,6 +50,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 def startup():
+    ensure_runtime_environment(engine)
     Base.metadata.create_all(bind=engine)
     ensure_runtime_columns(engine)
 

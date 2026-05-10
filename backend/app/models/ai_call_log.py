@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class AICallLog(Base):
@@ -29,4 +29,4 @@ class AICallLog(Base):
     http_status_code = Column(Integer, nullable=True, index=True)
     related_type = Column(String(50), nullable=True, index=True)
     related_id = Column(Integer, nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utc_now, index=True)

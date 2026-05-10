@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-import json
 from ...core.database import get_db
 from ...models.knowledge_point import KnowledgePoint
 from ...models.knowledge_base import KnowledgeBase
@@ -11,23 +10,10 @@ from ...models.wrong_question import WrongQuestion
 from ...models.audio_file import AudioFile
 from ...schemas.knowledge_point import KnowledgePointUpdate
 from ...services.audio_service import delete_audio_file
+from ...utils.json_helpers import dump_json as _dump_json
+from ...utils.json_helpers import load_json as _load_json
 
 router = APIRouter(prefix="/api/knowledge-points", tags=["knowledge-points"])
-
-
-def _load_json(value: str | None) -> list:
-    if not value:
-        return []
-    try:
-        return json.loads(value)
-    except Exception:
-        return []
-
-
-def _dump_json(value: list | None) -> str | None:
-    if value is None:
-        return None
-    return json.dumps(value, ensure_ascii=False)
 
 
 def _to_list_response(kp: KnowledgePoint, kb_name: str = "", mat_title: str = "") -> dict:

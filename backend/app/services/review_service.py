@@ -5,6 +5,7 @@ from ..models.review_task import ReviewTask
 from ..models.knowledge_point import KnowledgePoint
 from ..models.wrong_question import WrongQuestion
 from ..models.question import Question
+from ..utils.time import utc_now, utc_today_start
 
 
 REVIEW_BUCKETS = {"today", "overdue", "later", "completed"}
@@ -15,7 +16,7 @@ def apply_answer_review_result(db: Session, knowledge_point_id: int, is_correct:
     if not kp:
         raise ValueError("知识点不存在")
 
-    now = datetime.utcnow()
+    now = utc_now()
     kp.review_count = (kp.review_count or 0) + 1
     kp.last_reviewed_at = now
 
@@ -56,8 +57,7 @@ def apply_answer_review_result(db: Session, knowledge_point_id: int, is_correct:
 
 
 def get_today_review_overview(db: Session, knowledge_base_id: int | None = None, limit: int = 100) -> dict:
-    now = datetime.utcnow()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = utc_today_start()
     tomorrow_start = today_start + timedelta(days=1)
 
     base_query = db.query(KnowledgePoint)
@@ -119,7 +119,7 @@ def _review_bucket(task: ReviewTask, now: datetime | None = None) -> str:
     if task.status == "completed":
         return "completed"
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow = today + timedelta(days=1)
     scheduled_at = task.scheduled_at or now
@@ -180,7 +180,7 @@ def get_tasks(
         query = query.filter(KnowledgePoint.knowledge_base_id == knowledge_base_id)
     rows = query.order_by(ReviewTask.scheduled_at.asc().nullslast(), ReviewTask.created_at.asc()).all()
 
-    now = datetime.utcnow()
+    now = utc_now()
     result = [_task_to_response(task, kp, now) for task, kp in rows]
     if status in REVIEW_BUCKETS:
         result = [item for item in result if item["review_bucket"] == status]
@@ -211,7 +211,7 @@ def complete_task(db: Session, task_id: int, quality: str = "good") -> ReviewTas
     if not task:
         raise ValueError("任务不存在")
 
-    now = datetime.utcnow()
+    now = utc_now()
     next_review_count = task.review_count + 1
     interval_days = _next_interval_days(quality, next_review_count)
     task.status = "pending" if quality == "again" else "completed"
@@ -233,14 +233,14 @@ def snooze_task(db: Session, task_id: int, hours: int = 24) -> ReviewTask:
         raise ValueError("任务不存在")
 
     task.snooze_count += 1
-    task.scheduled_at = datetime.utcnow() + timedelta(hours=hours)
+    task.scheduled_at = utc_now() + timedelta(hours=hours)
     db.commit()
     db.refresh(task)
     return task
 
 
 def generate_tasks(db: Session, max_tasks: int = 30) -> dict:
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = utc_today_start()
 
     # 检查今天是否已生成过 pending 任务
     existing = (

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, case, distinct
 from sqlalchemy.orm import Session
@@ -10,13 +10,14 @@ from ...models.knowledge_base import KnowledgeBase
 from ...models.knowledge_point import KnowledgePoint
 from ...models.question import Question
 from ...models.review_task import ReviewTask
+from ...utils.time import utc_today_start
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
 @router.get("/overview")
 def get_overview(db: Session = Depends(get_db)):
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = utc_today_start()
 
     # 今日答题
     today_answers = db.query(AnswerRecord).filter(AnswerRecord.answered_at >= today).count()
@@ -142,7 +143,7 @@ def get_knowledge_base_stats(db: Session = Depends(get_db)):
 
 @router.get("/trends")
 def get_trends(days: int = 7, db: Session = Depends(get_db)):
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = utc_today_start()
     trends = []
     for i in range(days - 1, -1, -1):
         day_start = today - timedelta(days=i)

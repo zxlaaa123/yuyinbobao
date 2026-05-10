@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class ReviewTask(Base):
@@ -18,5 +18,5 @@ class ReviewTask(Base):
     review_count = Column(Integer, default=0, nullable=False)
     next_interval_days = Column(Integer, default=0, nullable=False)
     snooze_count = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

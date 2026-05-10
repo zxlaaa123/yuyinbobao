@@ -31,7 +31,7 @@ export interface UploadedTextMaterial {
   content: string
   source: string
   file_name: string
-  saved_path: string
+  saved_path: string | null
   content_length: number
 }
 

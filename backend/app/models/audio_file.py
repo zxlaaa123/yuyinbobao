@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Float, DateTime, ForeignKey
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class AudioFile(Base):
@@ -20,5 +20,5 @@ class AudioFile(Base):
     duration = Column(Float, nullable=True)
     status = Column(String(20), default="pending", nullable=False, index=True)
     error_message = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

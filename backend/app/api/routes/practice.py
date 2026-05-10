@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import json
+import re
 from ...core.database import get_db
 from ...models.question import Question
 from ...models.answer_record import AnswerRecord
@@ -14,12 +15,52 @@ def _normalize_text_answer(value: str | None) -> str:
     return " ".join((value or "").strip().lower().split())
 
 
-def _normalize_multi_answer(value: str | None) -> str:
-    parts = [part.strip().upper() for part in (value or "").split(",") if part.strip()]
+def _answer_to_text(value) -> str:
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value)
+    return str(value or "")
+
+
+def _normalize_multi_answer(value) -> str:
+    raw = _answer_to_text(value).strip().upper()
+    parts = [part for part in re.split(r"[\s,;，；、]+", raw) if part]
     return ",".join(sorted(set(parts)))
 
 
-def _is_answer_correct(question: Question, user_answer: str) -> bool:
+def _load_options(value: str | None) -> list:
+    if not value:
+        return []
+    try:
+        options = json.loads(value)
+        return options if isinstance(options, list) else []
+    except Exception:
+        return []
+
+
+def _validate_answer(question: Question, user_answer) -> str:
+    question_type = question.question_type or "single_choice"
+    answer_text = _answer_to_text(user_answer).strip()
+    if not answer_text:
+        raise HTTPException(status_code=400, detail="请选择答案")
+
+    if question_type == "multiple_choice":
+        normalized = _normalize_multi_answer(user_answer)
+        if not normalized:
+            raise HTTPException(status_code=400, detail="请选择答案")
+        valid_labels = {
+            str(option.get("label", "")).strip().upper()
+            for option in _load_options(question.options)
+            if isinstance(option, dict) and option.get("label")
+        }
+        selected = set(normalized.split(","))
+        if valid_labels and not selected.issubset(valid_labels):
+            raise HTTPException(status_code=400, detail="选项不在题目范围内")
+        return normalized
+
+    return answer_text
+
+
+def _is_answer_correct(question: Question, user_answer) -> bool:
     question_type = question.question_type or "single_choice"
     correct_answer = question.answer or ""
     if question_type == "multiple_choice":
@@ -63,49 +104,51 @@ def get_practice_questions(
 @router.post("/answer")
 def submit_answer(body: dict, db: Session = Depends(get_db)):
     question_id = body.get("question_id")
-    user_answer = (body.get("user_answer") or "").strip()
+    user_answer_raw = body.get("user_answer")
 
     if not question_id:
         raise HTTPException(status_code=400, detail="缺少 question_id")
-    if not user_answer:
-        raise HTTPException(status_code=400, detail="请选择答案")
-
     q = db.query(Question).filter(Question.id == question_id).first()
     if not q:
         raise HTTPException(status_code=404, detail="题目不存在")
 
+    user_answer = _validate_answer(q, user_answer_raw)
     is_correct = _is_answer_correct(q, user_answer)
 
-    # 保存答题记录
-    record = AnswerRecord(
-        question_id=q.id,
-        user_answer=user_answer,
-        is_correct=is_correct,
-    )
-    db.add(record)
+    try:
+        record = AnswerRecord(
+            question_id=q.id,
+            user_answer=user_answer,
+            is_correct=is_correct,
+        )
+        db.add(record)
 
-    wrong_question_id = None
-    if not is_correct:
-        # 查找是否已有错题记录
-        wq = db.query(WrongQuestion).filter(WrongQuestion.question_id == q.id).first()
-        if wq:
-            wq.wrong_count += 1
-            wq.last_wrong_answer = user_answer
-            wq.is_mastered = False
-        else:
-            wq = WrongQuestion(
-                question_id=q.id,
-                wrong_count=1,
-                last_wrong_answer=user_answer,
-                is_mastered=False,
-            )
-            db.add(wq)
-        db.flush()
-        wrong_question_id = wq.id
+        wrong_question_id = None
+        if not is_correct:
+            wq = db.query(WrongQuestion).filter(WrongQuestion.question_id == q.id).first()
+            if wq:
+                wq.wrong_count += 1
+                wq.last_wrong_answer = user_answer
+                wq.is_mastered = False
+            else:
+                wq = WrongQuestion(
+                    question_id=q.id,
+                    wrong_count=1,
+                    last_wrong_answer=user_answer,
+                    is_mastered=False,
+                )
+                db.add(wq)
+            db.flush()
+            wrong_question_id = wq.id
 
-    review = apply_answer_review_result(db, q.knowledge_point_id, is_correct)
-
-    db.commit()
+        review = apply_answer_review_result(db, q.knowledge_point_id, is_correct)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="提交答案失败，请稍后重试") from exc
 
     return {
         "question_id": q.id,

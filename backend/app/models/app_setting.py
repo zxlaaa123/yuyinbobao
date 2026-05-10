@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class AppSetting(Base):
@@ -11,5 +11,5 @@ class AppSetting(Base):
     value = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     is_secret = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

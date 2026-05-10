@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class Question(Base):
@@ -17,5 +17,5 @@ class Question(Base):
     analysis = Column(Text, nullable=True)
     difficulty = Column(String(20), default="medium", nullable=False, index=True)
     ai_raw_response = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

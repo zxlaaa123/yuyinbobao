@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Text
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class PracticeSessionItem(Base):
@@ -13,4 +13,4 @@ class PracticeSessionItem(Base):
     user_answer = Column(Text, nullable=True)
     is_correct = Column(Boolean, default=False, nullable=False, index=True)
     duration_seconds = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime, default=utc_now, nullable=False, index=True)

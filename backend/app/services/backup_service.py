@@ -1,4 +1,3 @@
-from datetime import datetime
 import sqlite3
 import shutil
 from pathlib import Path
@@ -9,6 +8,7 @@ from sqlalchemy.orm import Session
 from ..core.database import Base, SessionLocal, engine
 from ..core.paths import BACKUP_DIR, DB_PATH
 from ..models.backup_record import BackupRecord
+from ..utils.time import utc_now
 
 
 def _backup_sqlite_file(source: Path, target: Path) -> None:
@@ -22,7 +22,7 @@ def _backup_sqlite_file(source: Path, target: Path) -> None:
 
 
 def _build_backup_path(prefix: str = "app") -> tuple[str, Path]:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = utc_now().strftime("%Y%m%d_%H%M%S")
     filename = f"{prefix}_{timestamp}.db"
     return filename, BACKUP_DIR / filename
 

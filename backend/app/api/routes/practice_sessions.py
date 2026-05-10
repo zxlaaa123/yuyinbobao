@@ -1,6 +1,5 @@
 from collections import Counter
 import json
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -17,6 +16,7 @@ from ...schemas.practice_session import (
     PracticeSessionListResponse,
     PracticeSessionResponse,
 )
+from ...utils.time import utc_now
 
 router = APIRouter(prefix="/api/practice/sessions", tags=["practice-sessions"])
 
@@ -142,39 +142,42 @@ def create_practice_session(body: PracticeSessionCreate, db: Session = Depends(g
         weak_titles = "、".join([kp.title for kp in kp_titles][:3])
         suggestion = f"建议优先复习：{weak_titles}" if weak_titles else "建议优先复习本次错误较多的知识点。"
 
-    session = PracticeSession(
-        title=body.title,
-        mode=body.mode or "normal",
-        knowledge_base_id=body.knowledge_base_id,
-        total_count=total_count,
-        correct_count=correct_count,
-        wrong_count=wrong_count,
-        accuracy_rate=accuracy_rate,
-        duration_seconds=body.duration_seconds,
-        knowledge_point_ids=_dump_int_list(kp_ids),
-        weak_knowledge_point_ids=_dump_int_list(weak_kp_ids),
-        wrong_question_ids=_dump_int_list(wrong_q_ids),
-        suggestion=suggestion,
-        started_at=body.started_at or datetime.utcnow(),
-        ended_at=body.ended_at or datetime.utcnow(),
-    )
-    db.add(session)
-    db.flush()
-
-    for item in body.items:
-        db.add(
-            PracticeSessionItem(
-                session_id=session.id,
-                question_id=item.question_id,
-                knowledge_point_id=item.knowledge_point_id or q_map[item.question_id].knowledge_point_id,
-                user_answer=item.user_answer,
-                is_correct=item.is_correct,
-                duration_seconds=item.duration_seconds,
-            )
+    try:
+        session = PracticeSession(
+            title=body.title,
+            mode=body.mode or "normal",
+            knowledge_base_id=body.knowledge_base_id,
+            total_count=total_count,
+            correct_count=correct_count,
+            wrong_count=wrong_count,
+            accuracy_rate=accuracy_rate,
+            duration_seconds=body.duration_seconds,
+            knowledge_point_ids=_dump_int_list(kp_ids),
+            weak_knowledge_point_ids=_dump_int_list(weak_kp_ids),
+            wrong_question_ids=_dump_int_list(wrong_q_ids),
+            suggestion=suggestion,
+            started_at=body.started_at or utc_now(),
+            ended_at=body.ended_at or utc_now(),
         )
+        db.add(session)
+        db.flush()
 
-    db.commit()
-    db.refresh(session)
+        for item in body.items:
+            db.add(
+                PracticeSessionItem(
+                    session_id=session.id,
+                    question_id=item.question_id,
+                    knowledge_point_id=item.knowledge_point_id or q_map[item.question_id].knowledge_point_id,
+                    user_answer=item.user_answer,
+                    is_correct=item.is_correct,
+                    duration_seconds=item.duration_seconds,
+                )
+            )
+        db.commit()
+        db.refresh(session)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="保存练习记录失败，请稍后重试") from exc
     return _build_session_response(db, session, include_items=True)
 
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ...core.database import get_db
@@ -16,6 +16,7 @@ from ...models.wrong_question import WrongQuestion
 from ...models.question import Question
 from ...services.tts_service import build_text_from_knowledge_point, build_text_from_knowledge_points, synthesize_audio, normalize_audio_format
 from ...services.audio_service import delete_audio_file, generate_audio_filename, generate_collection_filename, save_audio_file, build_file_url
+from ...utils.time import utc_today_start
 
 router = APIRouter(prefix="/api/tts", tags=["tts"])
 
@@ -55,12 +56,12 @@ async def _render_audio_record(db: Session, audio_record: AudioFile, filename: s
         db.commit()
         db.refresh(audio_record)
         return audio_record
-    except Exception as e:
-        error_detail = f"{type(e).__name__}: {str(e)}"
+    except Exception:
+        error_detail = "TTS 生成失败，请检查 TTS 配置或稍后重试"
         audio_record.status = "failed"
         audio_record.error_message = error_detail
         db.commit()
-        raise HTTPException(status_code=500, detail=f"TTS 生成失败：{error_detail}") from e
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 def _audio_response(audio_record: AudioFile, **extra) -> dict:
@@ -203,7 +204,7 @@ async def _generate_collection_audio(db: Session, kps: list[KnowledgePoint], tit
 
 @router.post("/generate-daily-review")
 async def generate_daily_review(body: dict, db: Session = Depends(get_db)):
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today = utc_today_start()
 
     # 查找今日或逾期 pending 复习任务
     pending_tasks = (

@@ -1,6 +1,6 @@
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from ..core.database import Base
+from ..utils.time import utc_now
 
 
 class Material(Base):
@@ -16,5 +16,5 @@ class Material(Base):
     file_path = Column(String(500), nullable=True)
     content_length = Column(Integer, default=0)
     extracted_count = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
