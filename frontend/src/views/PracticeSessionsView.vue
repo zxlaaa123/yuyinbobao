@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import { getPracticeSession, getPracticeSessions } from '../api/practiceSession'
 import type { PracticeSession } from '../api/practiceSession'
 import { getErrorMessage } from '../utils/error'
+import { formatDateTime } from '../utils/date'
 
 const router = useRouter()
 const route = useRoute()
@@ -19,9 +20,7 @@ const detailLoading = ref(false)
 const detail = ref<PracticeSession | null>(null)
 
 function formatTime(value?: string | null) {
-  if (!value) return '-'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  return formatDateTime(value)
 }
 
 function formatDuration(seconds?: number | null) {

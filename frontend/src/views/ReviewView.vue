@@ -14,6 +14,7 @@ import type { ReviewTask } from '../api/review'
 import { useRouter } from 'vue-router'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
 import { confirmDelete } from '../utils/confirm'
+import { formatShortDateTime } from '../utils/date'
 
 const router = useRouter()
 const tasks = ref<ReviewTask[]>([])
@@ -146,8 +147,7 @@ function qualityLabel(quality: string | null): string {
 }
 
 function formatDate(d: string | null): string {
-  if (!d) return '-'
-  return new Date(d).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return formatShortDateTime(d)
 }
 
 function goDetail(kpId: number) {

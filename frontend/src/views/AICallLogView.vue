@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteAiCallLog, getAiCallLogDetail, getAiCallLogs, getAiCallLogSummary } from '../api/aiCallLog'
 import type { AICallLog, AICallLogSummary } from '../api/aiCallLog'
 import { getErrorMessage } from '../utils/error'
+import { formatDateTime } from '../utils/date'
 
 const logs = ref<AICallLog[]>([])
 const summary = ref<AICallLogSummary>({
@@ -58,7 +59,7 @@ function handleFilterChange() {
 }
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleString()
+  return formatDateTime(value)
 }
 
 function formatCost(value: number): string {

@@ -6,6 +6,7 @@ import { createBackup, deleteBackup, getBackups, restoreBackup, type BackupRecor
 import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from '../utils/theme'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
 import { confirmDelete } from '../utils/confirm'
+import { formatDateTime } from '../utils/date'
 
 const form = reactive({
   AI_PROVIDER: '',
@@ -194,7 +195,7 @@ function formatFileSize(size: number): string {
 }
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleString()
+  return formatDateTime(value)
 }
 
 onMounted(() => {
