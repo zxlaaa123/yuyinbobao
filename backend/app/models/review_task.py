@@ -1,10 +1,16 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import CheckConstraint, Column, Integer, String, DateTime, ForeignKey
 from ..core.database import Base
 from ..utils.time import utc_now
 
 
 class ReviewTask(Base):
     __tablename__ = "review_tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "source in ('wrong_question', 'importance_high', 'new_knowledge')",
+            name="ck_review_tasks_source",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     knowledge_point_id = Column(Integer, ForeignKey("knowledge_points.id"), nullable=False, index=True)

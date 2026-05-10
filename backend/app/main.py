@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +12,8 @@ from .core.migrations import ensure_runtime_columns
 from .core.startup import ensure_runtime_environment
 from . import models
 from .api import api_router
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 AUDIO_DIR.mkdir(parents=True, exist_ok=True)
@@ -45,6 +49,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        "Unhandled request error: %s %s",
+        request.method,
+        request.url.path,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
     return error_response(500, "服务器内部错误，请稍后重试", code="INTERNAL_ERROR")
 
 

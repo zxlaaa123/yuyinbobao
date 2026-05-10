@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ...core.database import get_db
 from ...models.knowledge_point import KnowledgePoint
@@ -93,13 +94,35 @@ def list_knowledge_points(
         query = query.filter(KnowledgePoint.tags.ilike(f"%{tag}%"))
 
     kps = query.order_by(KnowledgePoint.id.desc()).all()
+    kp_ids = [kp.id for kp in kps]
+    kb_ids = [kp.knowledge_base_id for kp in kps]
+    mat_ids = [kp.material_id for kp in kps if kp.material_id]
+    kb_map = {
+        kb.id: kb.name
+        for kb in db.query(KnowledgeBase).filter(KnowledgeBase.id.in_(kb_ids)).all()
+    } if kb_ids else {}
+    mat_map = {
+        mat.id: mat.title
+        for mat in db.query(Material).filter(Material.id.in_(mat_ids)).all()
+    } if mat_ids else {}
+    question_count_map = dict(
+        db.query(Question.knowledge_point_id, func.count(Question.id))
+        .filter(Question.knowledge_point_id.in_(kp_ids))
+        .group_by(Question.knowledge_point_id)
+        .all()
+    ) if kp_ids else {}
+    audio_count_map = dict(
+        db.query(AudioFile.knowledge_point_id, func.count(AudioFile.id))
+        .filter(AudioFile.knowledge_point_id.in_(kp_ids))
+        .group_by(AudioFile.knowledge_point_id)
+        .all()
+    ) if kp_ids else {}
+
     result = []
     for kp in kps:
-        kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == kp.knowledge_base_id).first()
-        mat = db.query(Material).filter(Material.id == kp.material_id).first() if kp.material_id else None
-        item = _to_list_response(kp, kb.name if kb else "", mat.title if mat else "")
-        item["question_count"] = db.query(Question).filter(Question.knowledge_point_id == kp.id).count()
-        item["audio_count"] = db.query(AudioFile).filter(AudioFile.knowledge_point_id == kp.id).count()
+        item = _to_list_response(kp, kb_map.get(kp.knowledge_base_id, ""), mat_map.get(kp.material_id, ""))
+        item["question_count"] = question_count_map.get(kp.id, 0)
+        item["audio_count"] = audio_count_map.get(kp.id, 0)
         result.append(item)
     return result
 

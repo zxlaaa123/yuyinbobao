@@ -43,9 +43,10 @@ def _build_session_response(
     session: PracticeSession,
     *,
     include_items: bool,
+    knowledge_base_name: str | None = None,
 ) -> PracticeSessionResponse:
-    kb_name = None
-    if session.knowledge_base_id:
+    kb_name = knowledge_base_name
+    if kb_name is None and session.knowledge_base_id:
         kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == session.knowledge_base_id).first()
         kb_name = kb.name if kb else None
 
@@ -200,8 +201,21 @@ def list_practice_sessions(
         query = query.filter(PracticeSession.mode == mode)
     total = query.count()
     rows = query.order_by(PracticeSession.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    kb_ids = [row.knowledge_base_id for row in rows if row.knowledge_base_id]
+    kb_map = {
+        kb.id: kb.name
+        for kb in db.query(KnowledgeBase).filter(KnowledgeBase.id.in_(kb_ids)).all()
+    } if kb_ids else {}
     return PracticeSessionListResponse(
-        items=[_build_session_response(db, row, include_items=False) for row in rows],
+        items=[
+            _build_session_response(
+                db,
+                row,
+                include_items=False,
+                knowledge_base_name=kb_map.get(row.knowledge_base_id),
+            )
+            for row in rows
+        ],
         total=total,
         page=page,
         page_size=page_size,

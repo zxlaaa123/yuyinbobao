@@ -31,10 +31,14 @@ def list_materials(knowledge_base_id: int | None = None, db: Session = Depends(g
     if knowledge_base_id:
         query = query.filter(Material.knowledge_base_id == knowledge_base_id)
     materials = query.order_by(Material.id.desc()).all()
+    kb_ids = [material.knowledge_base_id for material in materials]
+    kb_map = {
+        kb.id: kb.name
+        for kb in db.query(KnowledgeBase).filter(KnowledgeBase.id.in_(kb_ids)).all()
+    } if kb_ids else {}
     result = []
     for material in materials:
-        kb = db.query(KnowledgeBase).filter(KnowledgeBase.id == material.knowledge_base_id).first()
-        result.append(_to_response(material, kb.name if kb else ""))
+        result.append(_to_response(material, kb_map.get(material.knowledge_base_id, "")))
     return result
 
 

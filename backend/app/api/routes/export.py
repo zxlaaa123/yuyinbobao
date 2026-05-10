@@ -2,6 +2,7 @@ import csv
 import io
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import json
 from ...core.database import get_db
@@ -42,6 +43,13 @@ def export_knowledge_points_csv(
         raise HTTPException(status_code=400, detail="没有可导出的知识点")
 
     kb_map = _get_kb_map(db)
+    kp_ids = [kp.id for kp in kps]
+    question_count_map = dict(
+        db.query(Question.knowledge_point_id, func.count(Question.id))
+        .filter(Question.knowledge_point_id.in_(kp_ids))
+        .group_by(Question.knowledge_point_id)
+        .all()
+    ) if kp_ids else {}
 
     def load_json(value: str | None) -> list:
         if not value:
@@ -66,7 +74,7 @@ def export_knowledge_points_csv(
             kp.importance or "medium",
             "; ".join(load_json(kp.tags)),
             kb_map.get(kp.knowledge_base_id, ""),
-            str(db.query(Question).filter(Question.knowledge_point_id == kp.id).count()),
+            str(question_count_map.get(kp.id, 0)),
             str(kp.created_at) if kp.created_at else "",
         ])
 
@@ -96,6 +104,11 @@ def export_questions_csv(
 
     kb_map = _get_kb_map(db)
     kp_map = {kp.id: kp.title for kp in db.query(KnowledgePoint).all()}
+    q_ids = [wq.question_id for wq in wqs]
+    question_query = db.query(Question).filter(Question.id.in_(q_ids)) if q_ids else None
+    if question_query is not None and knowledge_base_id:
+        question_query = question_query.filter(Question.knowledge_base_id == knowledge_base_id)
+    q_map = {q.id: q for q in question_query.all()} if question_query is not None else {}
 
     headers = ["ID", "题型", "题干", "选项", "答案", "解析", "难度", "知识点", "知识库", "创建时间"]
     rows = []
@@ -143,10 +156,8 @@ def export_wrong_questions_csv(
     headers = ["ID", "题干", "题型", "选项", "正确答案", "解析", "难度", "错误次数", "上次错误答案", "是否掌握", "知识点", "知识库", "上次错误时间"]
     rows = []
     for wq in wqs:
-        q = db.query(Question).filter(Question.id == wq.question_id).first()
+        q = q_map.get(wq.question_id)
         if not q:
-            continue
-        if knowledge_base_id and q.knowledge_base_id != knowledge_base_id:
             continue
         opts = json.loads(q.options) if q.options else []
         opts_str = "; ".join(f"{o.get('key', '')}. {o.get('text', '')}" for o in opts)

@@ -1,3 +1,4 @@
+import json
 import time
 import httpx
 import base64
@@ -15,7 +16,6 @@ def build_text_from_knowledge_points(kps: list) -> str:
         if kp.detail:
             parts.append(f"详细说明：{kp.detail}")
         if kp.exam_points:
-            import json
             try:
                 points = json.loads(kp.exam_points)
                 if points:
@@ -25,7 +25,6 @@ def build_text_from_knowledge_points(kps: list) -> str:
             except Exception:
                 pass
         if kp.confusing_points:
-            import json
             try:
                 points = json.loads(kp.confusing_points)
                 if points:
@@ -35,7 +34,6 @@ def build_text_from_knowledge_points(kps: list) -> str:
             except Exception:
                 pass
         if kp.memory_tips:
-            import json
             try:
                 tips = json.loads(kp.memory_tips)
                 if tips:
@@ -45,7 +43,6 @@ def build_text_from_knowledge_points(kps: list) -> str:
             except Exception:
                 pass
         if kp.examples:
-            import json
             try:
                 examples = json.loads(kp.examples)
                 if examples:
@@ -70,7 +67,6 @@ def build_text_from_knowledge_point(kp) -> str:
     if kp.detail:
         parts.append(f"详细说明：{kp.detail}")
     if kp.exam_points:
-        import json
         try:
             points = json.loads(kp.exam_points)
             if points:
@@ -80,7 +76,6 @@ def build_text_from_knowledge_point(kp) -> str:
         except Exception:
             pass
     if kp.confusing_points:
-        import json
         try:
             points = json.loads(kp.confusing_points)
             if points:
@@ -90,7 +85,6 @@ def build_text_from_knowledge_point(kp) -> str:
         except Exception:
             pass
     if kp.memory_tips:
-        import json
         try:
             tips = json.loads(kp.memory_tips)
             if tips:
@@ -100,7 +94,6 @@ def build_text_from_knowledge_point(kp) -> str:
         except Exception:
             pass
     if kp.examples:
-        import json
         try:
             examples = json.loads(kp.examples)
             if examples:
@@ -145,11 +138,7 @@ def _mock_synthesize(text: str, audio_format: str) -> bytes:
         return _mock_wav(text)
     if audio_format == "pcm16":
         return b"\x00\x00" * _mock_sample_count(text)
-
-    mp3_header = b'\xff\xfb\x90\x00'
-    silent_frame = mp3_header + b'\x00' * 417
-    num_frames = max(1, len(text) // 50)
-    return silent_frame * min(num_frames, 30)
+    raise ValueError(f"不支持的音频格式: {audio_format}")
 
 
 def _mock_sample_count(text: str) -> int:
@@ -224,4 +213,3 @@ async def _xiaomi_synthesize(
         return base64.b64decode(audio_data)
     except Exception as exc:
         raise ValueError("小米 TTS 返回音频数据格式异常") from exc
-

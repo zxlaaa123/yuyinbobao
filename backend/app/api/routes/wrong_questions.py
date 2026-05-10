@@ -20,14 +20,23 @@ def list_wrong_questions(
         query = query.filter(WrongQuestion.is_mastered == is_mastered)
 
     wqs = query.order_by(WrongQuestion.last_wrong_at.desc()).all()
+    q_ids = [wq.question_id for wq in wqs]
+    question_query = db.query(Question).filter(Question.id.in_(q_ids)) if q_ids else None
+    if question_query is not None and knowledge_base_id:
+        question_query = question_query.filter(Question.knowledge_base_id == knowledge_base_id)
+    q_map = {q.id: q for q in question_query.all()} if question_query is not None else {}
+    kp_ids = [q.knowledge_point_id for q in q_map.values()]
+    kp_map = {
+        kp.id: kp
+        for kp in db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(kp_ids)).all()
+    } if kp_ids else {}
+
     result = []
     for wq in wqs:
-        q = db.query(Question).filter(Question.id == wq.question_id).first()
+        q = q_map.get(wq.question_id)
         if not q:
             continue
-        if knowledge_base_id and q.knowledge_base_id != knowledge_base_id:
-            continue
-        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == q.knowledge_point_id).first()
+        kp = kp_map.get(q.knowledge_point_id)
         result.append({
             "id": wq.id,
             "question_id": wq.question_id,

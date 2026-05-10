@@ -28,7 +28,13 @@ function getMessageFromData(data: unknown): string | null {
 }
 
 export function isUserCanceled(error: unknown): boolean {
-  return error === 'cancel' || error === 'close' || axios.isCancel(error)
+  if (error === 'cancel' || error === 'close' || axios.isCancel(error)) {
+    return true
+  }
+  if (error instanceof Error) {
+    return error.name === 'CanceledError' || error.message === 'canceled'
+  }
+  return false
 }
 
 export function getErrorMessage(error: unknown, fallback = '操作失败'): string {

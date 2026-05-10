@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getErrorMessage } from '../utils/error'
+import { getErrorMessage, isUserCanceled } from '../utils/error'
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
@@ -8,7 +8,12 @@ const service = axios.create({
 
 service.interceptors.response.use(
   (response) => response.data,
-  (error) => Promise.reject(new Error(getErrorMessage(error))),
+  (error) => {
+    if (isUserCanceled(error)) {
+      return Promise.reject(error)
+    }
+    return Promise.reject(new Error(getErrorMessage(error)))
+  },
 )
 
 export default service
