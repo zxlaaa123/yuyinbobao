@@ -120,7 +120,7 @@ async def synthesize_audio(
     base_url: str = "",
     model: str = "mimo-v2.5-tts",
     voice: str = "mimo_default",
-    audio_format: str = "mp3",
+    audio_format: str = "wav",
     style_prompt: str = "",
 ) -> bytes:
     audio_format = normalize_audio_format(audio_format)
@@ -167,13 +167,12 @@ async def _xiaomi_synthesize(
     audio_format: str,
     style_prompt: str,
 ) -> bytes:
-    """小米 TTS Provider"""
+    """小米 TTS Provider - 使用 MiMo-V2.5-TTS API"""
     if not api_key:
         raise ValueError("小米 TTS API Key 未配置")
-    if not base_url:
-        raise ValueError("小米 TTS Base URL 未配置")
 
-    url = f"{base_url.rstrip('/')}/chat/completions"
+    # 小米 TTS 使用固定 API 端点
+    url = "https://api.xiaomimimo.com/v1/chat/completions"
     headers = {
         "api-key": api_key,
         "Content-Type": "application/json",

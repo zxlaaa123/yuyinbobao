@@ -14,6 +14,7 @@ const searchResults = ref<SearchResult[]>([])
 const searchLoading = ref(false)
 const searchTouched = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchSeq = 0
 
 async function fetchHealth() {
   try {
@@ -51,13 +52,14 @@ async function runSearch() {
     return
   }
   searchLoading.value = true
+  const currentSeq = ++searchSeq
   try {
     const data = await searchLocal(keyword)
-    searchResults.value = data.results
+    if (currentSeq === searchSeq) searchResults.value = data.results
   } catch {
-    searchResults.value = []
+    if (currentSeq === searchSeq) searchResults.value = []
   } finally {
-    searchLoading.value = false
+    if (currentSeq === searchSeq) searchLoading.value = false
   }
 }
 
