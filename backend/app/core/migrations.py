@@ -62,6 +62,14 @@ def ensure_runtime_columns(engine: Engine) -> None:
             if ai_log_columns and column not in ai_log_columns:
                 conn.execute(text(f"ALTER TABLE ai_call_logs ADD COLUMN {column} {column_type}"))
 
+        session_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(study_sessions)")).fetchall()}
+        session_additions = {
+            "updated_at": "DATETIME",
+        }
+        for column, column_type in session_additions.items():
+            if session_columns and column not in session_columns:
+                conn.execute(text(f"ALTER TABLE study_sessions ADD COLUMN {column} {column_type}"))
+
         audio_columns = {row[1] for row in conn.execute(text("PRAGMA table_info(audio_files)")).fetchall()}
         audio_additions = {
             "audio_type": "VARCHAR(50) NOT NULL DEFAULT 'single'",
