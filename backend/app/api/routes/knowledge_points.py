@@ -9,6 +9,7 @@ from ...models.question import Question
 from ...models.answer_record import AnswerRecord
 from ...models.wrong_question import WrongQuestion
 from ...models.audio_file import AudioFile
+from ...models.review_task import ReviewTask
 from ...schemas.knowledge_point import KnowledgePointUpdate
 from ...services.audio_service import delete_audio_file
 from ...utils.json_helpers import dump_json as _dump_json
@@ -188,6 +189,8 @@ def delete_knowledge_point(kp_id: int, db: Session = Depends(get_db)):
         db.query(AnswerRecord).filter(AnswerRecord.question_id == q.id).delete()
         db.query(WrongQuestion).filter(WrongQuestion.question_id == q.id).delete()
         db.delete(q)
+    # 删除关联复习任务
+    db.query(ReviewTask).filter(ReviewTask.knowledge_point_id == kp.id).delete()
     # 删除关联音频
     audio_files = db.query(AudioFile).filter(AudioFile.knowledge_point_id == kp.id).all()
     for audio in audio_files:

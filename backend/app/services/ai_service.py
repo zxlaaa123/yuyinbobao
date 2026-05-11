@@ -125,8 +125,9 @@ class AIService:
                     related_id=related_id,
                 )
             raise
-        finally:
-            if log_call and response_text:
+        else:
+            # 仅在成功时写日志（避免 except 分支已写失败日志后又重复写成功日志）
+            if log_call:
                 self._write_log(
                     operation=operation,
                     status="success",
