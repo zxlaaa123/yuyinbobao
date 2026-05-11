@@ -104,11 +104,6 @@ def export_questions_csv(
 
     kb_map = _get_kb_map(db)
     kp_map = {kp.id: kp.title for kp in db.query(KnowledgePoint).all()}
-    q_ids = [wq.question_id for wq in wqs]
-    question_query = db.query(Question).filter(Question.id.in_(q_ids)) if q_ids else None
-    if question_query is not None and knowledge_base_id:
-        question_query = question_query.filter(Question.knowledge_base_id == knowledge_base_id)
-    q_map = {q.id: q for q in question_query.all()} if question_query is not None else {}
 
     headers = ["ID", "题型", "题干", "选项", "答案", "解析", "难度", "知识点", "知识库", "创建时间"]
     rows = []
@@ -152,6 +147,7 @@ def export_wrong_questions_csv(
 
     kb_map = _get_kb_map(db)
     kp_map = {kp.id: kp.title for kp in db.query(KnowledgePoint).all()}
+    q_map = {q.id: q for q in db.query(Question).filter(Question.id.in_([wq.question_id for wq in wqs])).all()}
 
     headers = ["ID", "题干", "题型", "选项", "正确答案", "解析", "难度", "错误次数", "上次错误答案", "是否掌握", "知识点", "知识库", "上次错误时间"]
     rows = []

@@ -1,9 +1,11 @@
 .env
 AGENTS.md
+CLAUDE.md
 data/
 docs/
 docs2/
 docs3/
+docs4/
 plans/
 .playwright-mcp/
 backend/.venv/
@@ -15,5 +17,10 @@ __pycache__/
 *.exe
 *.msi
 *.diagcab
+*.zip
+*.sig
+*.png
+test_*.png
 scripts/_test_*.py
 gitignore.txt
+MicrosoftProgram_Install_and_Uninstall.meta.diagcab
