@@ -7,12 +7,12 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id"), nullable=False, index=True)
-    knowledge_point_id = Column(Integer, ForeignKey("knowledge_points.id"), nullable=False, index=True)
+    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    knowledge_point_id = Column(Integer, ForeignKey("knowledge_points.id", ondelete="CASCADE"), nullable=False, index=True)
     question_type = Column(String(50), default="single_choice", nullable=False, index=True)
     stem = Column(Text, nullable=False)
     options = Column(Text, nullable=True)
-    answer = Column(String(100), nullable=False)
+    answer = Column(Text, nullable=False)
     reference_answer = Column(Text, nullable=True)
     analysis = Column(Text, nullable=True)
     difficulty = Column(String(20), default="medium", nullable=False, index=True)

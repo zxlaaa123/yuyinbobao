@@ -13,7 +13,7 @@ class ReviewTask(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    knowledge_point_id = Column(Integer, ForeignKey("knowledge_points.id"), nullable=False, index=True)
+    knowledge_point_id = Column(Integer, ForeignKey("knowledge_points.id", ondelete="CASCADE"), nullable=False, index=True)
     source = Column(String(20), nullable=False, default="wrong_question")
     status = Column(String(20), nullable=False, default="pending", index=True)
     difficulty = Column(String(20), nullable=False, default="medium")

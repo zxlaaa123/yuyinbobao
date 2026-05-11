@@ -7,8 +7,8 @@ class KnowledgePoint(Base):
     __tablename__ = "knowledge_points"
 
     id = Column(Integer, primary_key=True, index=True)
-    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id"), nullable=False, index=True)
-    material_id = Column(Integer, ForeignKey("materials.id"), nullable=True, index=True)
+    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    material_id = Column(Integer, ForeignKey("materials.id", ondelete="SET NULL"), nullable=True, index=True)
     title = Column(String(200), nullable=False, index=True)
     summary = Column(Text, nullable=True)
     detail = Column(Text, nullable=True)

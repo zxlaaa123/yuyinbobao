@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { checkHealth } from '../api/health'
 import { searchLocal, type SearchResult } from '../api/search'
@@ -29,15 +29,17 @@ onMounted(() => {
   fetchHealth()
 })
 
+onUnmounted(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
+
 function handleThemeChange(theme: ThemeName) {
   currentTheme.value = theme
   applyTheme(theme)
 }
 
 function handleSearchInput() {
-  if (searchTimer) {
-    clearTimeout(searchTimer)
-  }
+  if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(runSearch, 300)
 }
 

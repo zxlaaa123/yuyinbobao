@@ -1,21 +1,12 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 
 def _load_env():
     env_path = Path(__file__).resolve().parent.parent.parent.parent / ".env"
-    if not env_path.exists():
-        return
-    with open(env_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if key and key not in os.environ:
-                os.environ[key] = value
+    if env_path.exists():
+        load_dotenv(env_path)
 
 
 _load_env()

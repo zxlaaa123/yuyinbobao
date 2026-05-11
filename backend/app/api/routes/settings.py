@@ -23,6 +23,9 @@ def get_settings(db: Session = Depends(get_db)):
 
 @router.put("")
 def put_settings(body: dict, db: Session = Depends(get_db)):
+    for key, value in body.items():
+        if value is not None and isinstance(value, str) and len(value) > 2000:
+            raise HTTPException(status_code=400, detail=f"配置项 {key} 的值长度不能超过 2000 字符")
     updated = update_settings(db, body)
     # 敏感字段脱敏后返回
     for key in SENSITIVE_KEYS:

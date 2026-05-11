@@ -7,7 +7,7 @@ class WrongQuestion(Base):
     __tablename__ = "wrong_questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, unique=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
     wrong_count = Column(Integer, default=1, nullable=False)
     last_wrong_answer = Column(Text, nullable=True)
     last_wrong_at = Column(DateTime, default=utc_now)

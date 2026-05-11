@@ -91,10 +91,14 @@ def list_knowledge_points(
     if keyword:
         kw = f"%{keyword}%"
         query = query.filter(KnowledgePoint.title.ilike(kw) | KnowledgePoint.summary.ilike(kw))
-    if tag:
-        query = query.filter(KnowledgePoint.tags.ilike(f"%{tag}%"))
 
     kps = query.order_by(KnowledgePoint.id.desc()).all()
+
+    if tag:
+        # 在 Python 层面过滤，避免 JSON 字段 ilike 误匹配
+        tag_lower = tag.lower()
+        kps = [kp for kp in kps if kp.tags and tag_lower in kp.tags.lower()]
+
     kp_ids = [kp.id for kp in kps]
     kb_ids = [kp.knowledge_base_id for kp in kps]
     mat_ids = [kp.material_id for kp in kps if kp.material_id]

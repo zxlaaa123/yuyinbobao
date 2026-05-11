@@ -1,4 +1,5 @@
 import time
+import hashlib
 from pathlib import Path
 from ..core.paths import AUDIO_DIR
 
@@ -10,7 +11,7 @@ def generate_audio_filename(knowledge_point_id: int, ext: str = "wav") -> str:
 
 def generate_collection_filename(kp_ids: list[int], ext: str = "wav") -> str:
     ts = time.strftime("%Y%m%d_%H%M%S")
-    ids_hash = "_".join(str(i) for i in sorted(kp_ids))
+    ids_hash = hashlib.md5("_".join(str(i) for i in sorted(kp_ids)).encode()).hexdigest()[:12]
     return f"collection_{ids_hash}_{ts}.{ext}"
 
 

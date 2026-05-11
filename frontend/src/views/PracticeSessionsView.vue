@@ -6,6 +6,7 @@ import { getPracticeSession, getPracticeSessions } from '../api/practiceSession'
 import type { PracticeSession } from '../api/practiceSession'
 import { getErrorMessage } from '../utils/error'
 import { formatDateTime } from '../utils/date'
+import { formatDuration } from '../utils/format'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,13 +22,6 @@ const detail = ref<PracticeSession | null>(null)
 
 function formatTime(value?: string | null) {
   return formatDateTime(value)
-}
-
-function formatDuration(seconds?: number | null) {
-  const totalSec = Math.max(0, seconds || 0)
-  const min = Math.floor(totalSec / 60)
-  const sec = totalSec % 60
-  return min > 0 ? `${min} 分 ${sec} 秒` : `${sec} 秒`
 }
 
 function questionTypeLabel(type?: string | null) {

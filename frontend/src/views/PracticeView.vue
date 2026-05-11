@@ -6,10 +6,11 @@ import { getPracticeQuestions, submitAnswer } from '../api/practice'
 import { createStudySession, finishStudySession } from '../api/studySession'
 import { createPracticeSession } from '../api/practiceSession'
 import { getKnowledgeBasesForSelect } from '../api/material'
-import type { PracticeQuestion } from '../api/practice'
+import type { PracticeQuestion, AnswerResult } from '../api/practice'
 import type { StudySession } from '../api/studySession'
 import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage } from '../utils/error'
+import { formatDuration } from '../utils/format'
 
 type Phase = 'setup' | 'practicing' | 'finished'
 
@@ -21,7 +22,7 @@ const selectedAnswer = ref('')
 const selectedAnswers = ref<string[]>([])
 const textAnswer = ref('')
 const answered = ref(false)
-const answerResult = ref<any>(null)
+const answerResult = ref<AnswerResult | null>(null)
 const phase = ref<Phase>('setup')
 const correctCount = ref(0)
 const wrongCount = ref(0)
@@ -112,13 +113,6 @@ function questionTypeLabel(type: string) {
     short_answer: '简答题',
   }
   return map[type] || type || '单选题'
-}
-
-function formatDuration(seconds?: number | null) {
-  const total = Math.max(0, seconds || 0)
-  const min = Math.floor(total / 60)
-  const sec = total % 60
-  return min > 0 ? `${min} 分 ${sec} 秒` : `${sec} 秒`
 }
 
 function isChoiceQuestion(question?: PracticeQuestion | null) {

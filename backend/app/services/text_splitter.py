@@ -4,6 +4,8 @@ def split_text(text: str, segment_size: int = 3000, max_segments: int = 5) -> li
     优先在段落分隔处（空行）切割，其次在句子边界（句号/问号/感叹号）切割。
     每段不超过 segment_size 字符，总段数不超过 max_segments。
     """
+    segment_size = max(segment_size, 100)
+    max_segments = max(max_segments, 1)
     if len(text) <= segment_size:
         return [text]
 

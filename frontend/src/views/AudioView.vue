@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppEmpty from '../components/AppEmpty.vue'
 import { getAudioFiles, deleteAudioFile, retryAudioFile } from '../api/audio'
@@ -8,6 +8,7 @@ import type { AudioFile } from '../api/audio'
 import type { KnowledgeBase } from '../api/material'
 import { getErrorMessage, isUserCanceled } from '../utils/error'
 import { confirmDelete } from '../utils/confirm'
+import { formatFileSize } from '../utils/format'
 
 const audioFiles = ref<AudioFile[]>([])
 const knowledgeBases = ref<KnowledgeBase[]>([])
@@ -88,12 +89,13 @@ function typeLabel(type: string) {
   }[type] || type
 }
 
-function formatFileSize(size: number | null): string {
-  if (!size) return '-'
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
-}
+onUnmounted(() => {
+  document.querySelectorAll('.audio-player audio').forEach((el) => {
+    const audio = el as HTMLAudioElement
+    audio.pause()
+    audio.src = ''
+  })
+})
 
 onMounted(async () => {
   try {

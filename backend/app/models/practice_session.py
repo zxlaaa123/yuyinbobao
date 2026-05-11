@@ -3,13 +3,16 @@ from ..core.database import Base
 from ..utils.time import utc_now
 
 
+# 注意：knowledge_point_ids、weak_knowledge_point_ids、wrong_question_ids
+# 使用 Text 存储 JSON 数组，这是 V1 的有意设计折中。
+# 如果需要按这些 ID 查询，应创建关联表。
 class PracticeSession(Base):
     __tablename__ = "practice_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(200), nullable=True)
     mode = Column(String(50), default="normal", nullable=False, index=True)
-    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id"), nullable=True, index=True)
+    knowledge_base_id = Column(Integer, ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=True, index=True)
     total_count = Column(Integer, default=0, nullable=False)
     correct_count = Column(Integer, default=0, nullable=False)
     wrong_count = Column(Integer, default=0, nullable=False)

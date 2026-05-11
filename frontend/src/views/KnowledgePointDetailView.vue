@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppEmpty from '../components/AppEmpty.vue'
@@ -132,6 +132,11 @@ async function fetchData() {
   loading.value = true
   try {
     const id = Number(route.params.id)
+    if (!Number.isFinite(id) || id <= 0) {
+      ElMessage.error('无效的知识点 ID')
+      router.push('/knowledge-points')
+      return
+    }
     kp.value = await getKnowledgePoint(id)
   } catch (e) {
     ElMessage.error(getErrorMessage(e, '加载知识点失败'))
@@ -232,8 +237,15 @@ async function handleGenerateQuestions() {
 
 onMounted(async () => {
   await fetchData()
-  await loadExistingAudio()
-  await loadFlashcards()
+  await Promise.all([loadExistingAudio(), loadFlashcards()])
+})
+onUnmounted(() => {
+  audioLoading.value = false
+  audioFileUrl.value = null
+  audioError.value = null
+  flashcards.value = []
+  flashcardsLoading.value = false
+  flashcardsGenerating.value = false
 })
 </script>
 

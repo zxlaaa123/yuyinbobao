@@ -7,6 +7,7 @@ import { THEME_OPTIONS, applyTheme, getStoredTheme, type ThemeName } from '../ut
 import { getErrorMessage, isUserCanceled } from '../utils/error'
 import { confirmDelete } from '../utils/confirm'
 import { formatDateTime } from '../utils/date'
+import { formatFileSize } from '../utils/format'
 
 const form = reactive({
   AI_PROVIDER: '',
@@ -112,14 +113,8 @@ async function handleTestAi() {
   try {
     const result = await testAiConnection()
     aiTestResult.value = result
-    if (result.success) {
-      ElMessage.success(result.message)
-    } else {
-      ElMessage.warning(result.message)
-    }
   } catch (e) {
     aiTestResult.value = { success: false, message: getErrorMessage(e, '测试失败') }
-    ElMessage.error(aiTestResult.value.message)
   } finally {
     testingAi.value = false
   }
@@ -131,14 +126,8 @@ async function handleTestTts() {
   try {
     const result = await testTtsConnection()
     ttsTestResult.value = result
-    if (result.success) {
-      ElMessage.success(result.message)
-    } else {
-      ElMessage.warning(result.message)
-    }
   } catch (e) {
     ttsTestResult.value = { success: false, message: getErrorMessage(e, '测试失败') }
-    ElMessage.error(ttsTestResult.value.message)
   } finally {
     testingTts.value = false
   }
@@ -186,12 +175,6 @@ async function handleDeleteBackup(item: BackupRecord) {
       ElMessage.error(getErrorMessage(e, '删除备份失败'))
     }
   }
-}
-
-function formatFileSize(size: number): string {
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 function formatDate(value: string): string {

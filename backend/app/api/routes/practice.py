@@ -65,6 +65,20 @@ def _is_answer_correct(question: Question, user_answer) -> bool:
     correct_answer = question.answer or ""
     if question_type == "multiple_choice":
         return _normalize_multi_answer(user_answer) == _normalize_multi_answer(correct_answer)
+    if question_type == "true_false":
+        correct = _normalize_text_answer(correct_answer)
+        user = _normalize_text_answer(_answer_to_text(user_answer))
+        true_values = {"正确", "对", "是", "true", "a", "1", "yes"}
+        false_values = {"错误", "错", "否", "false", "b", "0", "no"}
+        correct_is_true = correct in true_values
+        correct_is_false = correct in false_values
+        user_is_true = user in true_values
+        user_is_false = user in false_values
+        if correct_is_true:
+            return user_is_true
+        if correct_is_false:
+            return user_is_false
+        return user == correct
     if question_type in {"fill_blank", "short_answer"}:
         return _normalize_text_answer(user_answer) == _normalize_text_answer(correct_answer)
     return _normalize_text_answer(user_answer) == _normalize_text_answer(correct_answer)

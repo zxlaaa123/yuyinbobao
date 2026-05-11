@@ -383,7 +383,8 @@ class AIService:
                 related_id=related_id,
             )
         except Exception:
-            pass
+            import logging
+            logging.getLogger(__name__).warning("Failed to write AI call log", exc_info=True)
 
 
 def _elapsed_ms(started: float) -> int:
